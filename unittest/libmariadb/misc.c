@@ -1662,6 +1662,13 @@ static int test_disable_tls1_0(MYSQL *my __attribute__((unused)))
   return OK;
 }
 
+static int test_null_handles(MYSQL *)
+{
+  mysql_close(NULL);
+  mysql_stmt_close(NULL);
+  return OK;
+}
+
 
 struct my_tests_st my_tests[] = {
   {"test_disable_tls1_0", test_disable_tls1_0, TEST_CONNECTION_DEFAULT, 0, NULL, NULL},
@@ -1707,7 +1714,8 @@ struct my_tests_st my_tests[] = {
   {"test_ldi_path", test_ldi_path, TEST_CONNECTION_NEW, 0, NULL, NULL},
 #ifdef _WIN32
   {"test_conc44", test_conc44, TEST_CONNECTION_NEW, 0, NULL, NULL},
-#endif 
+#endif
+  {"test_null_handles", test_null_handles, TEST_CONNECTION_NONE, 0, NULL, NULL},
   {NULL, NULL, 0, 0, NULL, 0}
 };
 

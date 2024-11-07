@@ -129,7 +129,7 @@ static my_bool madb_have_pending_results(MYSQL_STMT *stmt)
 {
   LIST *li_stmt;
 
-  if (!stmt->mysql)
+  if (!stmt || !stmt->mysql)
     return 0;
 
   li_stmt= stmt->mysql->stmts;
