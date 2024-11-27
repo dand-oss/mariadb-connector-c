@@ -2370,6 +2370,9 @@ static int test_parsec(MYSQL *my)
   rc= mysql_query(my, "DROP USER test1@'%'");
   check_mysql_rc(rc, my);
 
+  rc= mysql_query(my, "UNINSTALL soname IF EXISTS 'auth_parsec'");
+  check_mysql_rc(rc, my);
+
   mysql_close(mysql);
   return OK;
 }
