@@ -50,6 +50,7 @@
 #include "mysql.h"
 #include <math.h> /* ceil() */
 #include <limits.h>
+#include <stdint.h>
 
 #ifdef WIN32
 #include <malloc.h>
@@ -1145,29 +1146,25 @@ void ps_fetch_datetime(MYSQL_BIND *r_param, const MYSQL_FIELD * field,
         length= sprintf(dtbuffer, "%04u-%02u-%02u", tm.year, tm.month, tm.day);
         break;
       case MYSQL_TYPE_TIME:
-        length= sprintf(dtbuffer, "%s%02u:%02u:%02u", (tm.neg ? "-" : ""), tm.hour, tm.minute, tm.second);
-        if (field->decimals && field->decimals <= 6)
+        if (field->decimals && (field->decimals <= SEC_PART_DIGITS ||
+                               (field->decimals == AUTO_SEC_PART_DIGITS && tm.second_part)))
         {
-          char ms[8];
-          sprintf(ms, ".%06lu", tm.second_part);
-          if (field->decimals < 6)
-            ms[field->decimals + 1]= 0;
-          length+= strlen(ms);
-          strcat(dtbuffer, ms);
-        }
+          uint8_t decimals= (field->decimals == AUTO_SEC_PART_DIGITS) ? SEC_PART_DIGITS : field->decimals;
+          length= sprintf(dtbuffer, "%s%02u:%02u:%02u.%0*u", (tm.neg ? "-" : ""), tm.hour, tm.minute, tm.second,
+                          decimals, (uint32_t)(tm.second_part / pow(10, 6 - decimals)));
+        } else
+          length= sprintf(dtbuffer, "%s%02u:%02u:%02u", (tm.neg ? "-" : ""), tm.hour, tm.minute, tm.second);
         break;
       case MYSQL_TYPE_DATETIME:
       case MYSQL_TYPE_TIMESTAMP:
-        length= sprintf(dtbuffer, "%04u-%02u-%02u %02u:%02u:%02u", tm.year, tm.month, tm.day, tm.hour, tm.minute, tm.second);
-        if (field->decimals && field->decimals <= 6)
+        if (field->decimals && (field->decimals <= SEC_PART_DIGITS ||
+                               (field->decimals == AUTO_SEC_PART_DIGITS && tm.second_part)))
         {
-          char ms[8];
-          sprintf(ms, ".%06lu", tm.second_part);
-          if (field->decimals < 6)
-            ms[field->decimals + 1]= 0;
-          length+= strlen(ms);
-          strcat(dtbuffer, ms);
-        }
+          uint8_t decimals= (field->decimals == AUTO_SEC_PART_DIGITS) ? SEC_PART_DIGITS : field->decimals;
+          length= sprintf(dtbuffer, "%04u-%02u-%02u %02u:%02u:%02u.%0*u", tm.year, tm.month, tm.day, tm.hour, tm.minute, tm.second,
+                          decimals, (uint32_t)(tm.second_part / pow(10, 6 - decimals)));
+        } else
+          length= sprintf(dtbuffer, "%04u-%02u-%02u %02u:%02u:%02u", tm.year, tm.month, tm.day, tm.hour, tm.minute, tm.second);
         break;
       default:
         dtbuffer[0]= 0;

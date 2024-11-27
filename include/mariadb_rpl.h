@@ -73,6 +73,8 @@ extern "C" {
 #define SEMI_SYNC_INDICATOR 0xEF
 #define SEMI_SYNC_ACK_REQ   0x01
 
+enum Item_result {STRING_RESULT,REAL_RESULT,INT_RESULT,ROW_RESULT,DECIMAL_RESULT};
+
 /* Options */
 enum mariadb_rpl_option {
   MARIADB_RPL_FILENAME,       /* Filename and length */

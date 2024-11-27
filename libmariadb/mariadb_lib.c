@@ -2054,6 +2054,12 @@ error:
   if (!(client_flag & CLIENT_REMEMBER_OPTIONS) &&
       !(IS_MYSQL_ASYNC(mysql)))
     mysql_close_options(mysql);
+
+  /* CONC-703: If no error was set, we set CR_SERVER_LOST by default */
+  if (!mysql_errno(mysql))
+    my_set_error(mysql, CR_SERVER_LOST, SQLSTATE_UNKNOWN,
+                        "Can't connect to server (%d).",
+                        errno);
   return(0);
 }
 
