@@ -56,6 +56,10 @@ struct Passwd_in_memory
   uchar pub_key[ED25519_KEY_LENGTH];
 };
 
+#ifdef _MSC_VER
+# define _Static_assert static_assert
+#endif
+
 _Static_assert(sizeof(struct Passwd_in_memory) == 2 + CHALLENGE_SALT_LENGTH
                                                    + ED25519_KEY_LENGTH,
               "Passwd_in_memory should be packed.");
