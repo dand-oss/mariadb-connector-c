@@ -94,7 +94,7 @@ int compute_derived_key(const char* password, size_t pass_len,
   /*
     pbkdf2/nettle functions are third party, so ignore the bad function casts
   */
-# ifdef __clang__
+# if defined __clang_major__ && __clang_major__ >= 16
 #  pragma clang diagnostic push
 #  pragma clang diagnostic ignored "-Wcast-function-type-strict"
 # endif
