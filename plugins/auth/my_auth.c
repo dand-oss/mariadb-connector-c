@@ -508,7 +508,14 @@ static int send_client_reply_packet(MCPVIO_EXT *mpvio,
   */
   if (mysql->client_flag & CLIENT_ZSTD_COMPRESSION)
   {
-    *end++= 3;
+    uchar compression_level= 3;
+    if (mysql->options.extension &&
+        mysql->options.extension->zstd_compression_level >= 1 &&
+        mysql->options.extension->zstd_compression_level <= 20)
+    {
+        compression_level= mysql->options.extension->zstd_compression_level;
+    }
+    *end++= compression_level;
   }
 
   /* Write authentication package */

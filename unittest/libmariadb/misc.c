@@ -1705,8 +1705,24 @@ static int test_null_handles(MYSQL *mysql __attribute__((unused)))
 }
 
 
+static int test_comp_level(MYSQL *my __attribute__((unused)))
+{
+  unsigned char clevel= 5;
+  unsigned char clevel1= 0;
+  MYSQL *mysql= mysql_init(NULL);
+
+  mysql_optionsv(mysql, MYSQL_OPT_ZSTD_COMPRESSION_LEVEL, &clevel);
+  mysql_get_optionv(mysql, MYSQL_OPT_ZSTD_COMPRESSION_LEVEL, &clevel1);
+
+  FAIL_IF(clevel != clevel1, "Different compression levels");
+  mysql_close(mysql);
+
+  return OK;
+}
+
 struct my_tests_st my_tests[] = {
   {"test_disable_tls1_0", test_disable_tls1_0, TEST_CONNECTION_DEFAULT, 0, NULL, NULL},
+  {"test_comp_level", test_comp_level, TEST_CONNECTION_NONE, 0, NULL, NULL},
   {"test_ext_field_attr", test_ext_field_attr, TEST_CONNECTION_DEFAULT, 0, NULL, NULL},
   {"test_conc533", test_conc533, TEST_CONNECTION_NEW, 0, NULL, NULL},
   {"test_conc163", test_conc163, TEST_CONNECTION_DEFAULT, 0, NULL, NULL},
