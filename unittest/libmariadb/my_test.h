@@ -588,7 +588,7 @@ void get_envvars() {
   if (!getenv("MYSQLTEST_VARDIR") &&
       !getenv("MARIADB_CC_TEST"))
   {
-    skip_all("Tests skipped.\nFor running unittest suite outside of MariaDB server tests,\nplease specify MARIADB_CC_TEST environment variable.");
+    skip_all("Tests skipped.\nFor running unittest suite outside of MariaDB server tests,\nplease specify MARIADB_CC_TEST environment variable.\n");
     exit(0);
   }
 
