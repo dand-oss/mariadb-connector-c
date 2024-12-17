@@ -5812,25 +5812,31 @@ static int test_conc683(MYSQL *mysql)
 static int test_conc702(MYSQL *ma)
 {
   MYSQL_STMT *stmt, *stmt2;
+  int rc;
 
   diag("Server info %s\nClient info: %s",
       mysql_get_server_info(ma), mysql_get_client_info());
 
-  mysql_query(ma, "DROP PROCEDURE IF EXISTS p1");
+  rc= mysql_query(ma, "DROP PROCEDURE IF EXISTS p1");
+  check_mysql_rc(rc, ma);
 
-  mysql_query(ma, "CREATE PROCEDURE p1() BEGIN"
+  rc= mysql_query(ma, "CREATE PROCEDURE p1() BEGIN"
                   "  SELECT 1 FROM DUAL; "
                   "END");
+  check_mysql_rc(rc, ma);
 
   stmt= mysql_stmt_init(ma);
 
   FAIL_IF(!stmt, "Could not allocate stmt");
 
-  mysql_stmt_prepare(stmt, "CALL p1()", -1);
-  mysql_stmt_execute(stmt);
+  rc= mysql_stmt_prepare(stmt, "CALL p1()", -1);
+  check_stmt_rc(rc, stmt);
+  rc= mysql_stmt_execute(stmt);
+  check_stmt_rc(rc, stmt);
 
  
   mysql_stmt_store_result(stmt);
+  check_stmt_rc(rc, stmt);
 
   // We've done everything w/ result and skip everything else
 
@@ -5871,6 +5877,10 @@ static int test_conc702(MYSQL *ma)
   mysql_stmt_close(stmt2);
 
   mysql_stmt_close(stmt);
+
+  rc= mysql_query(ma, "DROP PROCEDURE p2");
+  check_mysql_rc(rc, ma);
+
   return OK;
 }
 
