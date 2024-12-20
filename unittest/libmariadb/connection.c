@@ -2460,8 +2460,8 @@ static int test_conc589(MYSQL *my)
 
   mysql_options(mysql, MYSQL_OPT_RECONNECT, &reconnect);
 
-  if (!my_test_connect(mysql, hostname, NULL,
-                             NULL, schema, port, socketname, CLIENT_REMEMBER_OPTIONS, 0))
+  if (!my_test_connect(mysql, hostname, username,
+                       password, schema, port, socketname, CLIENT_REMEMBER_OPTIONS, 0))
   {
     diag("error: %s", mysql_error(mysql));
     return FAIL;
