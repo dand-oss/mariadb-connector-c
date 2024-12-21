@@ -51,7 +51,7 @@ if [ -n "$server_branch" ] ; then
   make -j9
 
   cd mysql-test/
-  ./mysql-test-run.pl --suite=main ${TEST_OPTION} --parallel=auto --skip-test=session_tracker_last_gtid
+  ./mysql-test-run.pl --suite=main,unit ${TEST_OPTION} --parallel=auto --skip-test=session_tracker_last_gtid
 
 else
 

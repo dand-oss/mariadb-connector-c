@@ -993,7 +993,7 @@ static void convert_from_double(MYSQL_BIND *r_param, const MYSQL_FIELD *field, d
        if (field->length < length || field->length > MAX_DOUBLE_STRING_REP_LENGTH - 1)
          break;
        ma_bmove_upp(buff + field->length, buff + length, length);
-       /* coverity [bad_memset] */
+       /* coverity[bad_memset] */
        memset((void*) buff, (int) '0', field->length - length);
        length= field->length;
      }

@@ -2433,8 +2433,8 @@ static int test_conc748(MYSQL *my __attribute__((unused)))
     mysql_ssl_set(mysql, NULL, NULL, NULL, NULL, NULL);
     mysql_optionsv(mysql, MYSQL_OPT_SSL_CIPHER, ciphers[i]);
 
-    if (!my_test_connect(mysql, hostname, NULL,
-                               NULL, schema, port, socketname, 0, 0))
+    if (!my_test_connect(mysql, hostname, username,
+                         password, schema, port, socketname, 0))
     {
       diag("error: %s", mysql_error(mysql));
       return FAIL;

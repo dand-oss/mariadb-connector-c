@@ -914,10 +914,7 @@ static int parse_connection_string(MYSQL *mysql, const char *unused __attribute_
             pos += 2;
             continue;
           }
-          if (in_curly_brace)
-            in_curly_brace= 0;
-          else
-            goto error;
+          in_curly_brace= 0;
           *pos++= 0;
           continue;
         }
