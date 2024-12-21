@@ -1089,7 +1089,7 @@ static int test_unix_socket_close(MYSQL *unused __attribute__((unused)))
 
   for (i=0; i < 10000; i++)
   {
-    my_test_connect(mysql, "localhost", "user", "passwd", NULL, 0, "./dummy_sock", 0, 1);
+    mysql_real_connect(mysql, "localhost", "user", "passwd", NULL, 0, "./dummy_sock", 0);
     /* check if we run out of sockets */
     if (mysql_errno(mysql) == 2001)
     {
@@ -2434,7 +2434,7 @@ static int test_conc748(MYSQL *my __attribute__((unused)))
     mysql_optionsv(mysql, MYSQL_OPT_SSL_CIPHER, ciphers[i]);
 
     if (!my_test_connect(mysql, hostname, username,
-                         password, schema, port, socketname, 0))
+                         password, schema, port, socketname, 0, 0))
     {
       diag("error: %s", mysql_error(mysql));
       return FAIL;
