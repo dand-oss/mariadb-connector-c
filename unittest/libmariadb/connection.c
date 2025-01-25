@@ -2341,6 +2341,20 @@ static int test_parsec(MYSQL *my)
   int rc;
   int verify= 0;
   MYSQL *mysql;
+
+  if (!is_mariadb)
+  {
+    diag("feature not supported by MySQL server");
+    return SKIP;
+  }
+
+  if (!mysql_client_find_plugin(my, "parsec", MYSQL_CLIENT_AUTHENTICATION_PLUGIN))
+  {
+    diag("parsec plugin not available");
+    diag("error: %s", mysql_error(my));
+    return SKIP;
+  }
+
   rc= mysql_query(my, "INSTALL soname 'auth_parsec'");
   if (rc)
   {
@@ -2351,14 +2365,6 @@ static int test_parsec(MYSQL *my)
   check_mysql_rc(rc, my);
 
   mysql= mysql_init(NULL);
-  if (!mysql_client_find_plugin(mysql, "parsec", MYSQL_CLIENT_AUTHENTICATION_PLUGIN))
-  {
-    diag("parsec plugin not available");
-    diag("error: %s", mysql_error(mysql));
-    mysql_close(mysql);
-    return SKIP;
-  }
-
   mysql_options(mysql, MYSQL_OPT_SSL_VERIFY_SERVER_CERT, &verify);
   if (!my_test_connect(mysql, hostname, "test1", "123", NULL, port, socketname, 0, 0))
   {
