@@ -2423,6 +2423,7 @@ static int test_conc748(MYSQL *my __attribute__((unused)))
   MYSQL *mysql;
   int i;
   const char *ciphers[3]= {"TLS_AES_128_GCM_SHA256", "TLS_AES_256_GCM_SHA384", "TLS_CHACHA20_POLY1305_SHA256"};
+  my_bool verify= 0;
 
   SKIP_MAXSCALE;
 
@@ -2432,6 +2433,7 @@ static int test_conc748(MYSQL *my __attribute__((unused)))
     mysql= mysql_init(NULL);
 
     mysql_ssl_set(mysql, NULL, NULL, NULL, NULL, NULL);
+    mysql_optionsv(mysql, MYSQL_OPT_SSL_VERIFY_SERVER_CERT, &verify);
     mysql_optionsv(mysql, MYSQL_OPT_SSL_CIPHER, ciphers[i]);
 
     if (!my_test_connect(mysql, hostname, username,

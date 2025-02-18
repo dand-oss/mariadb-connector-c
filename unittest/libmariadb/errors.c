@@ -287,6 +287,7 @@ static int test_mdev35935(MYSQL *mysql)
   MYSQL_BIND bind[2];
   const char *data= "test";
 
+  SKIP_MAXSCALE;
   SKIP_MYSQL(mysql);
 
   rc= mysql_select_db(mysql, schema);
