@@ -385,7 +385,7 @@ mthd_my_send_cmd(MYSQL *mysql,enum enum_server_command command, const char *arg,
 
   /* CONC-589: If reconnect option was specified, we have to check if the connection
                (socket) is still available */
-  if (command != COM_QUIT && mysql->options.reconnect && ma_pvio_is_alive(mysql->net.pvio))
+  if (command != COM_QUIT && mysql->options.reconnect && !ma_pvio_is_alive(mysql->net.pvio))
   {
     ma_pvio_close(mysql->net.pvio);
     mysql->net.pvio= NULL;
