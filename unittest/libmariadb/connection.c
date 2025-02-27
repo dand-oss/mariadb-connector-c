@@ -2420,6 +2420,7 @@ static int test_conc760(MYSQL *my)
   MYSQL_RES *result;
   MYSQL_ROW row;
   int rc;
+  char named_pipe_name[128];
   my_bool reconnect= 1, verify= 0;
   unsigned long last_thread_id= 0;
   unsigned int protocol= MYSQL_PROTOCOL_PIPE;
@@ -2427,13 +2428,15 @@ static int test_conc760(MYSQL *my)
 
   SKIP_MAXSCALE;
 
-  rc= mysql_query(my, "select @@named_pipe");
+  rc= mysql_query(my, "select @@named_pipe, @@socket");
   check_mysql_rc(rc, mysql);
 
   if ((result= mysql_store_result(my)))
   {
     if((row= mysql_fetch_row(result)))
       have_named_pipe= atoi(row[0]);
+    strncpy(named_pipe_name, row[1], sizeof(named_pipe_name)-1);
+    named_pipe_name[sizeof(named_pipe_name)-1]= '\0';
     mysql_free_result(result);
   }
 
@@ -2448,7 +2451,7 @@ static int test_conc760(MYSQL *my)
   mysql_options(mysql, MYSQL_OPT_PROTOCOL, &protocol);
 
   if (!my_test_connect(mysql, hostname, username,
-                       password, schema, port, socketname, CLIENT_REMEMBER_OPTIONS))
+                       password, schema, port, named_pipe_name, CLIENT_REMEMBER_OPTIONS))
   {
     diag("error: %s", mysql_error(mysql));
     return FAIL;
