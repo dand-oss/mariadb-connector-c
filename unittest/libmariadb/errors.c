@@ -337,6 +337,10 @@ static int test_mdev35935(MYSQL *mysql)
   mysql_stmt_close(stmt);
   rc= mysql_query(mysql, "DROP TABLE IF EXISTS bulk1");
   check_mysql_rc(rc, mysql);
+
+  free(buffer);
+  free(lengths);
+  free(vals);
   return OK;
 }
 
