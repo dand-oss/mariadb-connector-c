@@ -886,6 +886,11 @@ static int parse_connection_string(MYSQL *mysql, const char *unused __attribute_
 
   /* don't modify original dsn */
   conn_save= (char *)malloc(len + 1);
+  if (!conn_save)
+  {
+    SET_CLIENT_ERROR(mysql, CR_OUT_OF_MEMORY, SQLSTATE_UNKNOWN, 0);
+    return 1;
+  }
   memcpy(conn_save, conn_str, len);
   conn_save[len]= 0;
 
