@@ -5174,9 +5174,13 @@ static int test_maxparam(MYSQL *mysql)
   bind = calloc(65535, sizeof *bind);
 
   rc= mysql_query(mysql, "DROP TABLE IF EXISTS t1");
+  if (rc)
+    free(bind);
   check_mysql_rc(rc, mysql);
 
   rc= mysql_query(mysql, "CREATE TABLE t1 (a int)");
+  if (rc)
+    free(bind);
   check_mysql_rc(rc, mysql);
 
   buffer= calloc(1, mem);
@@ -5184,6 +5188,8 @@ static int test_maxparam(MYSQL *mysql)
   for (i=0; i < 65534.; i++)
     strcat(buffer, ",(?)");
   rc= mysql_stmt_prepare(stmt, SL(buffer));
+  if (rc)
+    free(bind);
   check_stmt_rc(rc, stmt);
 
   for (i=0; i < 65534; i++)
@@ -5193,9 +5199,13 @@ static int test_maxparam(MYSQL *mysql)
   }
 
   rc= mysql_stmt_bind_param(stmt, bind);
+  if (rc)
+    free(bind);
   check_stmt_rc(rc, stmt);
 
   rc= mysql_stmt_execute(stmt);
+  if (rc)
+    free(bind);
   check_stmt_rc(rc, stmt);
 
   FAIL_IF(mysql_stmt_affected_rows(stmt) != 65535, "Expected affected_rows=65535");
