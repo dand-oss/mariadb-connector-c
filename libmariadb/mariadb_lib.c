@@ -4599,6 +4599,7 @@ my_bool mariadb_get_infov(MYSQL *mysql, enum mariadb_value value, void *arg, ...
       size= va_arg(ap, unsigned int);
       if (!ma_pvio_tls_get_peer_cert_info(mysql->net.pvio->ctls, size))
         *((MARIADB_X509_INFO **)arg)= (MARIADB_X509_INFO *)&mysql->net.pvio->ctls->cert_info;
+      va_end(ap);
       return 0;
     }
     *((MARIADB_X509_INFO **)arg)= NULL;
