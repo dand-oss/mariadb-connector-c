@@ -287,6 +287,8 @@ static int test_frm_bug(MYSQL *mysql)
   }
 
   rc= mysql_query(mysql, "SHOW TABLE STATUS like 'test_frm_bug'");
+  if (rc)
+    fclose(test_file);
   check_mysql_rc(rc, mysql);
 
   result= mysql_store_result(mysql);
