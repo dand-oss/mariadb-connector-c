@@ -1568,42 +1568,8 @@ mysql_real_connect(MYSQL *mysql, const char *host, const char *user,
       return my;
     }
   }
-#ifndef HAVE_SCHANNEL
   return mysql->methods->db_connect(mysql, host, user, passwd,
                                     db, port, unix_socket, client_flag);
-#else
-/* 
-   With older windows versions (prior Win 10) TLS connections periodically
-   fail with SEC_E_INVALID_TOKEN, SEC_E_BUFFER_TOO_SMALL or SEC_E_MESSAGE_ALTERED
-   error (see MDEV-13492). If the connect attempt returns on of these error codes
-   in mysql->net.extended_errno we will try to connect again (max. 3 times)
-*/
-#define MAX_SCHANNEL_CONNECT_ATTEMPTS 3
-  {
-    int ssl_retry= (mysql->options.use_ssl) ? MAX_SCHANNEL_CONNECT_ATTEMPTS : 1;
-	MYSQL *my= NULL;
-    while (ssl_retry)
-    {
-      if ((my= mysql->methods->db_connect(mysql, host, user, passwd,
-                                    db, port, unix_socket, client_flag | CLIENT_REMEMBER_OPTIONS)))
-        return my;
-
-      switch (mysql->net.extension->extended_errno) {
-        case SEC_E_INVALID_TOKEN:
-        case SEC_E_BUFFER_TOO_SMALL:
-        case SEC_E_MESSAGE_ALTERED:
-          ssl_retry--;
-          break;
-        default:
-          ssl_retry= 0;
-          break;
-      }
-    }
-    if (!my && !(client_flag & CLIENT_REMEMBER_OPTIONS))
-      mysql_close_options(mysql);
-    return my;
-  }
-#endif
 }
 
 struct st_host {
