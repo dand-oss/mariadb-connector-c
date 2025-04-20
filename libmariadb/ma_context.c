@@ -107,8 +107,21 @@ my_context_spawn(struct my_context *c, void (*f)(void *), void *d)
   c->active= 1;
   u.a[1]= 0;   /* Otherwise can give uninitialized warnings on 32-bit. */
   u.p= c;
+  /*
+    makecontext function expects function pointer to receive multiple
+    ints as an arguments, however is declared in ucontext.h header with
+    a void (empty) argument list. Ignore clang cast-function-type-strict
+    warning for this function call.
+  */
+# ifdef __clang__
+#  pragma clang diagnostic push
+#  pragma clang diagnostic ignored "-Wcast-function-type-strict"
+# endif
   makecontext(&c->spawned_context, (uc_func_t)my_context_spawn_internal, 2,
               u.a[0], u.a[1]);
+# ifdef __clang__
+#  pragma clang diagnostic pop
+# endif
 
   return my_context_continue(c);
 }
@@ -725,7 +738,11 @@ my_context_spawn(struct my_context *c, void (*f)(void *), void *d)
        [stack] "+r" (stack)
      : [save] "r" (save)
      : "x3", "x4", "x5", "x6", "x7",
-       "x9", "x10", "x11", "x14", "x15", "x18", "x30",
+       "x9", "x10", "x11", "x14", "x15",
+#if defined(__linux__) && !defined(__ANDROID__)
+       "x18",
+#endif
+       "x30",
        "v0", "v1", "v2", "v3", "v4", "v5", "v6", "v7",
        "v16", "v17", "v18", "v19", "v20", "v21", "v22", "v23",
        "v24", "v25", "v26", "v27", "v28", "v29", "v30", "v31",
@@ -828,7 +845,11 @@ my_context_continue(struct my_context *c)
      : [ret] "=r" (ret)
      : [save] "r" (save)
      : "x1", "x2", "x3", "x4", "x5", "x6", "x7",
-       "x9", "x10", "x11", "x12", "x13", "x14", "x15", "x18", "x30",
+       "x9", "x10", "x11", "x12", "x13", "x14", "x15",
+#if defined(__linux__) && !defined(__ANDROID__)
+       "x18",
+#endif
+       "x30",
        "v0", "v1", "v2", "v3", "v4", "v5", "v6", "v7",
        "v16", "v17", "v18", "v19", "v20", "v21", "v22", "v23",
        "v24", "v25", "v26", "v27", "v28", "v29", "v30", "v31",
@@ -905,7 +926,11 @@ my_context_yield(struct my_context *c)
      :
      : [save] "r" (save)
      : "x0", "x1", "x2", "x3", "x4", "x5", "x6", "x7",
-       "x9", "x10", "x11", "x12", "x13", "x14", "x15", "x18", "x30",
+       "x9", "x10", "x11", "x12", "x13", "x14", "x15",
+#if defined(__linux__) && !defined(__ANDROID__)
+       "x18",
+#endif
+       "x30",
        "v0", "v1", "v2", "v3", "v4", "v5", "v6", "v7",
        "v16", "v17", "v18", "v19", "v20", "v21", "v22", "v23",
        "v24", "v25", "v26", "v27", "v28", "v29", "v30", "v31",
