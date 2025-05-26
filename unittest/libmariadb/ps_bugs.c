@@ -5172,6 +5172,9 @@ static int test_maxparam(MYSQL *mysql)
   check_mysql_rc(rc, mysql);
 
   buffer= calloc(1, mem);
+  if(!buffer)
+    free(bind);
+  FAIL_UNLESS(bind, "Not enough memory");
   strcpy(buffer, query);
   for (i=0; i < 65534.; i++)
     strcat(buffer, ",(?)");
