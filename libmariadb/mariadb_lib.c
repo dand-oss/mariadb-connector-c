@@ -810,7 +810,6 @@ my_bool _mariadb_set_conf_option(MYSQL *mysql, const char *config_option, const 
         switch (mariadb_defaults[i].type) {
         case MARIADB_OPTION_FUNC:
           return mariadb_defaults[i].u.option_func(mysql, config_option, config_value, -1);
-          break;
         case MARIADB_OPTION_BOOL:
           val_bool= 0;
           if (config_value)
@@ -929,7 +928,6 @@ static int parse_connection_string(MYSQL *mysql, const char *unused __attribute_
         if (pos <= end)
           val= pos;
         continue;
-        break;
       case ';':
         if (in_curly_brace)
         {
@@ -943,7 +941,6 @@ static int parse_connection_string(MYSQL *mysql, const char *unused __attribute_
           _mariadb_set_conf_option(mysql, key, val);
         key= val= NULL;
         continue;
-        break;
     }
     if (!key && *pos)
       key= pos;

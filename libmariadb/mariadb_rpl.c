@@ -1166,7 +1166,6 @@ MARIADB_RPL_EVENT * STDCALL mariadb_rpl_fetch(MARIADB_RPL *rpl, MARIADB_RPL_EVEN
     case UNKNOWN_EVENT:
     case SLAVE_EVENT:
        return rpl_event;
-       break;
     case HEARTBEAT_LOG_EVENT:
       /* no post header size */
       RPL_CHECK_POS(ev, ev_end, 11);
@@ -1898,7 +1897,6 @@ MARIADB_RPL_EVENT * STDCALL mariadb_rpl_fetch(MARIADB_RPL *rpl, MARIADB_RPL_EVEN
         return 0;
       }
       return rpl_event;
-      break;
     }
 
     /* check if we have to send acknowledgement to primary
@@ -2092,7 +2090,6 @@ int STDCALL mariadb_rpl_get_optionsv(MARIADB_RPL *rpl,
   default:
     va_end(ap);
     return 1;
-    break;
   }
   va_end(ap);
   return 0;
