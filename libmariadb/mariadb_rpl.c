@@ -119,7 +119,6 @@ void rpl_set_error(MARIADB_RPL *rpl,
 
   const char *errmsg;
 
-  return;
   if (!format)
   {
     if (error_nr >= CR_MIN_ERROR && error_nr <= CR_MYSQL_LAST_ERROR)
