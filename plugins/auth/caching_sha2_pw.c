@@ -362,7 +362,10 @@ static int auth_caching_sha2_client(MYSQL_PLUGIN_VIO *vio, MYSQL *mysql)
 
 #endif
     if (!pubkey)
-      return CR_ERROR;
+    {
+      rc= CR_ERROR;
+      goto error;
+    }
 
     pwlen= (unsigned int)strlen(mysql->passwd) + 1;  /* include terminating zero */
     if (pwlen > MAX_PW_LEN)
