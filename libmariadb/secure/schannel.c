@@ -462,7 +462,8 @@ static SECURITY_STATUS init_auth_data(MA_SCHANNEL_CREDENTIALS *ma_cred,
     ma_cred->use_old_cred_structure= TRUE;
   }
 
-  if (!os_version_greater_equal(10, 0, 22000))
+  /* CONC-778: Windows 11 starts with build 22000, Windows Server 2022 with 20348 */
+  if (!os_version_greater_equal(10, 0, 20348))
   {
     ma_cred->use_old_cred_structure= TRUE;
   }
