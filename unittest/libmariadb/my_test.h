@@ -99,6 +99,10 @@ if (IS_MAXSCALE()) \
   return SKIP; \
 }
 
+#define IS_ENTERPRISE()\
+   ((mysql_default && strstr(mysql_get_server_info(mysql_default), "enterprise")) ||\
+     (getenv("srv")!=NULL && (strcmp(getenv("srv"), "enterprise"))))
+
 #define IS_XPAND()\
    ((mysql_default && strstr(mysql_get_server_info(mysql_default), "Xpand")) ||\
     (getenv("srv")!=NULL && strcmp(getenv("srv"), "xpand") == 0))

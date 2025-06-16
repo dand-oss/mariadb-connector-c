@@ -1663,8 +1663,13 @@ int display_extended_field_attribute(MYSQL *mysql)
 
 static int test_ext_field_attr(MYSQL *mysql)
 {
+  if (!is_mariadb)
+  {
+    diag("feature not supported by MySQL server");
+    return SKIP;
+  }
   display_extended_field_attribute(mysql);
-  
+
   return OK;
 }
 
