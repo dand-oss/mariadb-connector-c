@@ -635,7 +635,6 @@ void get_envvars() {
       ssl_port= atoi(envvar);
     else
       ssl_port = port;
-    diag("ssl_port: %d", ssl_port);
   }
 
   if (!force_tls && (envvar= check_envvar("MYSQL_TEST_TLS")))
@@ -646,15 +645,17 @@ void get_envvars() {
     if ((envvar= check_envvar("MYSQL_TEST_SOCKET")) ||
         (envvar= check_envvar("MASTER_MYSOCK")))
       socketname= envvar;
-    diag("socketname: %s", socketname);
   }
   if ((envvar= check_envvar("MYSQL_TEST_PLUGINDIR")))
     plugindir= envvar;
 
-  if (IS_XPAND())
-  {
-
-  }
+  diag("Connection parameters");
+  diag("Schema: %s", schema);
+  diag("Host: %s", hostname);
+  diag("Port: %d", port);
+  diag("TLS Port: %d", ssl_port);
+  diag("Socket: %s", socketname);
+  diag("Plugindir: %s", plugindir);
 }
 
 MYSQL *my_test_connect(MYSQL *mysql,
