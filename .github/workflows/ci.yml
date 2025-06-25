@@ -14,21 +14,14 @@ concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: false
 
-env:
-  MYSQL_TEST_HOST: mariadb.example.com
-  MYSQL_TEST_PORT: 3306
-  MYSQL_TEST_USER: root
-  MYSQL_TEST_PASSWD: "heyPassw-!*20oRd"
-  MYSQL_TEST_DB: testc
-
 jobs:
 
   setup:
     runs-on: ubuntu-latest
     if: |
-      github.event_name != 'schedule' || 
-      github.ref == 'refs/heads/3.4' || 
-      github.ref == 'refs/heads/3.1' || 
+      github.event_name != 'schedule' ||
+      github.ref == 'refs/heads/3.4' ||
+      github.ref == 'refs/heads/3.1' ||
       github.ref == 'refs/heads/3.2'
     outputs:
       matrix: ${{ steps.set-matrix.outputs.final-matrix }}
@@ -47,8 +40,6 @@ jobs:
     strategy:
       matrix:
         server:
-          - version: '10.6'
-          - version: '10.11'
           - version: '11.4'
           - version: '11.8'
             env: TEST_OPTION=--ps-protocol
@@ -60,7 +51,7 @@ jobs:
           git clone -b ${server_branch} https://github.com/mariadb/server ./workdir-server --depth=1
         env:
           server_branch: ${{ matrix.server.version }}
-      
+
       - name: Update libmariadb submodule for PR
         if: github.event_name == 'pull_request'
         shell: bash
@@ -70,7 +61,7 @@ jobs:
           cd libmariadb
           git fetch origin ${{ github.event.pull_request.head.sha }}
           git checkout -qf FETCH_HEAD
-      
+
       - name: Update libmariadb submodule for non-PR
         if: github.event_name != 'pull_request'
         shell: bash
@@ -120,6 +111,13 @@ jobs:
     name: ${{ matrix.name }}
     needs: setup
     timeout-minutes: 50
+    env:
+      MYSQL_TEST_HOST: mariadb.example.com
+      MYSQL_TEST_PORT: 3306
+      MYSQL_TEST_USER: root
+      MYSQL_TEST_PASSWD: "heyPassw-!*20oRd"
+      MYSQL_TEST_DB: testc
+
     strategy:
       matrix: ${{ fromJSON(needs.setup.outputs.matrix) }}
 
