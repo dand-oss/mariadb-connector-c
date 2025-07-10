@@ -820,7 +820,6 @@ my_bool _mariadb_set_conf_option(MYSQL *mysql, const char *config_option, const 
         switch (mariadb_defaults[i].type) {
         case MARIADB_OPTION_FUNC:
           return mariadb_defaults[i].u.option_func(mysql, config_option, config_value, -1);
-          break;
         case MARIADB_OPTION_BOOL:
           val_bool= 0;
           if (config_value)
@@ -939,7 +938,6 @@ static int parse_connection_string(MYSQL *mysql, const char *unused __attribute_
         if (pos <= end)
           val= pos;
         continue;
-        break;
       case ';':
         if (in_curly_brace)
         {
@@ -953,7 +951,6 @@ static int parse_connection_string(MYSQL *mysql, const char *unused __attribute_
           _mariadb_set_conf_option(mysql, key, val);
         key= val= NULL;
         continue;
-        break;
     }
     if (!key && *pos)
       key= pos;
@@ -1367,7 +1364,11 @@ mysql_init(MYSQL *mysql)
   return mysql;
 error:
   if (mysql->free_me)
+  {
+    if (mysql->net.extension)
+      free(mysql->net.extension);
     free(mysql);
+  }
   return 0;
 }
 
@@ -2122,7 +2123,14 @@ my_bool STDCALL mariadb_reconnect(MYSQL *mysql)
     return(1);
   }
 
-  mysql_init(&tmp_mysql);
+  if (!mysql_init(&tmp_mysql))
+  {
+    /* extensions may have failed to allocate */
+    SET_CLIENT_ERROR(mysql, CR_OUT_OF_MEMORY, SQLSTATE_UNKNOWN, 0);
+    tmp_mysql.free_me= 0;
+    mysql_close(&tmp_mysql);
+    return(1);
+  }
   tmp_mysql.free_me= 0;
   tmp_mysql.options=mysql->options;
   if (mysql->extension->conn_hdlr)
