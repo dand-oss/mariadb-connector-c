@@ -1884,9 +1884,9 @@ MARIADB_RPL_EVENT * STDCALL mariadb_rpl_fetch(MARIADB_RPL *rpl, MARIADB_RPL_EVEN
       /* We need to report an error if this event can't be ignored */
       if (!(rpl_event->flags & LOG_EVENT_IGNORABLE_F))
       {
-        mariadb_free_rpl_event(rpl_event);
         rpl_set_error(rpl, CR_UNKNOWN_BINLOG_EVENT, 0, RPL_ERR_POS(rpl),
                       rpl_event->event_type);
+        mariadb_free_rpl_event(rpl_event);
         return 0;
       }
       return rpl_event;
@@ -1976,6 +1976,12 @@ int STDCALL mariadb_rpl_optionsv(MARIADB_RPL *rpl,
     else if (arg1)
     {
       rpl->filename= strdup((const char *)arg1);
+      if (!rpl->filename)
+      {
+        va_end(ap);
+        rpl_set_error(rpl, CR_OUT_OF_MEMORY, 0);
+        return 1;
+      }
       rpl->filename_length= (uint32_t)strlen(rpl->filename);
     }
     break;
