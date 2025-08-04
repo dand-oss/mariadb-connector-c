@@ -346,7 +346,12 @@ static int send_client_reply_packet(MCPVIO_EXT *mpvio,
       the server does not know we want to do SSL
     */
     if (proxy_header_len)
+    {
       ma_net_write_buff(net, proxy_header, proxy_header_len);
+      /* Reset proxy header */
+      proxy_header_len= 0;
+      proxy_header= NULL;
+    }
 
     if (ma_net_write(net, (unsigned char *)buff, (size_t) (end-buff)) || ma_net_flush(net))
     {
