@@ -836,9 +836,9 @@ static int test_conc795(MYSQL *my __attribute__((unused)))
 
   set_verify(mysql, 0);
 
-  if (ma_is_ip_address(hostname))
+  if (!hostname || ma_is_ip_address(hostname))
   {
-    diag("SNI test skipped (hostname = ip address");
+    diag("SNI test skipped (hostname = ip address or empty)");
     ret = SKIP;
     goto end;
   }
