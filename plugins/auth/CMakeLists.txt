@@ -12,11 +12,9 @@ ELSEIF(WITH_SSL STREQUAL "GNUTLS")
   SET(CRYPT_SOURCE ${CC_SOURCE_DIR}/libmariadb/secure/gnutls_crypt.c)
   INCLUDE(${CC_SOURCE_DIR}/cmake/FindNettle.cmake)
   INCLUDE(${CC_SOURCE_DIR}/cmake/FindHogweed.cmake)
-  IF (NOT SSL_LIBRARIES MATCHES "^.*\\.a$")
-    SET(CRYPT_LIBS ${SSL_LIBRARIES})
+  SET(CRYPT_LIBS ${SSL_LIBRARIES})
   IF (NETTLE_FOUND AND HOGWEED_FOUND)
     SET(PARSEC_EXTRA_LIBS ${NETTLE_LIBRARIES} ${HOGWEED_LIBRARIES})
-  ENDIF()
   ENDIF()
 ELSEIF(WITH_SSL STREQUAL "SCHANNEL")
   ADD_DEFINITIONS(-DHAVE_WINCRYPT)
@@ -38,7 +36,8 @@ REGISTER_PLUGIN(TARGET dialog
                 TYPE AUTH
                 CONFIGURATIONS DYNAMIC STATIC OFF
                 DEFAULT DYNAMIC
-                SOURCES ${AUTH_DIR}/dialog.c
+                LIBRARIES ${CMAKE_DL_LIBS}
+                SOURCES ${CC_SOURCE_DIR}/plugins/auth/dialog.c
                         ${CC_SOURCE_DIR}/libmariadb/get_password.c)
 
 
