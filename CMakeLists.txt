@@ -59,12 +59,10 @@ asv_cmake_defaults( )
 SET(CC_SOURCE_DIR ${CMAKE_CURRENT_SOURCE_DIR})
 SET(CC_BINARY_DIR ${CMAKE_CURRENT_BINARY_DIR})
 
-# Select link target for tests/tools: static when available, shared otherwise
-IF(WITH_STATIC_LIB)
-  SET(MARIADB_CLIENT_LIB mariadbclient)
-ELSE()
-  SET(MARIADB_CLIENT_LIB libmariadb)
-ENDIF()
+# Tests always link against static lib (they access internal symbols not
+# exported from the shared library).  The static lib is always built;
+# WITH_STATIC_LIB only controls whether it is installed.
+SET(MARIADB_CLIENT_LIB mariadbclient)
 
 SET(CPACK_PACKAGE_VERSION_MAJOR 3)
 SET(CPACK_PACKAGE_VERSION_MINOR 4)

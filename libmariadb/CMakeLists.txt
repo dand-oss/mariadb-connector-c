@@ -441,10 +441,11 @@ IF(WIN32)
                    "FILE_DESCRIPTION:Dynamic lib for client/server communication")
 ENDIF()
 
-IF(WITH_STATIC_LIB)
+# Always build the static library — unit tests link against it to access
+# internal symbols that are hidden in the shared library's version script.
+# WITH_STATIC_LIB only controls whether the static lib is installed.
 ADD_LIBRARY(mariadbclient STATIC  ${MARIADB_OBJECTS} ${EMPTY_FILE})
 TARGET_LINK_LIBRARIES(mariadbclient ${SYSTEM_LIBS} ${CRYPT_LIBS})
-ENDIF()
 
 IF(UNIX)
   ADD_LIBRARY(libmariadb SHARED ${libmariadb_RC} ${MARIADB_OBJECTS} ${EMPTY_FILE})
@@ -466,12 +467,10 @@ IF(CMAKE_SYSTEM_NAME MATCHES "Linux" OR
   SET_TARGET_PROPERTIES(libmariadb PROPERTIES LINK_FLAGS "${CC_BINARY_DIR}/libmariadb/mariadbclient.def")
 ENDIF()
 
-IF(WITH_STATIC_LIB)
 SET_TARGET_PROPERTIES(mariadbclient PROPERTIES IMPORTED_INTERFACE_LINK_LIBRARIES "${SYSTEM_LIBS}")
 TARGET_INCLUDE_DIRECTORIES(mariadbclient PUBLIC
     $<INSTALL_INTERFACE:${INSTALL_INCLUDEDIR}>
 )
-ENDIF()
 SET_TARGET_PROPERTIES(libmariadb PROPERTIES IMPORTED_INTERFACE_LINK_LIBRARIES "${SYSTEM_LIBS}")
 
 # Export include directories for consumers via find_package()
@@ -507,11 +506,11 @@ SET_TARGET_PROPERTIES(libmariadb PROPERTIES VERSION
  ${CPACK_PACKAGE_VERSION_MAJOR}
  SOVERSION ${CPACK_PACKAGE_VERSION_MAJOR})
 
-IF(WITH_STATIC_LIB)
 IF(NOT WIN32)
   SET_TARGET_PROPERTIES(mariadbclient PROPERTIES OUTPUT_NAME "${LIBMARIADB_STATIC_NAME}")
 ENDIF()
 
+IF(WITH_STATIC_LIB)
 INSTALL(TARGETS mariadbclient
           EXPORT ${PROJECT_NAME}Targets
           COMPONENT Development
