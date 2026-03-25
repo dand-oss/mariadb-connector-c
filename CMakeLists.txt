@@ -41,6 +41,8 @@ ADD_OPTION(WITH_BOOST_CONTEXT
   "Use Boost::Context for the non-blocking API on platforms without native implementation"
   OFF)
 
+ADD_OPTION(WITH_STATIC_LIB "Build static library" OFF)
+
 IF(WITH_BOOST_CONTEXT)
   PROJECT(mariadb-connector-c LANGUAGES C CXX)
 ELSE()
@@ -56,6 +58,13 @@ asv_cmake_defaults( )
 
 SET(CC_SOURCE_DIR ${CMAKE_CURRENT_SOURCE_DIR})
 SET(CC_BINARY_DIR ${CMAKE_CURRENT_BINARY_DIR})
+
+# Select link target for tests/tools: static when available, shared otherwise
+IF(WITH_STATIC_LIB)
+  SET(MARIADB_CLIENT_LIB mariadbclient)
+ELSE()
+  SET(MARIADB_CLIENT_LIB libmariadb)
+ENDIF()
 
 SET(CPACK_PACKAGE_VERSION_MAJOR 3)
 SET(CPACK_PACKAGE_VERSION_MINOR 4)
