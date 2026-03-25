@@ -47,6 +47,13 @@ ELSE()
   PROJECT(mariadb-connector-c C)
 ENDIF()
 
+###############
+# ASI default settings
+list(APPEND CMAKE_MODULE_PATH "$ENV{ASV_CMAKE}")
+include(asv_cmake_defaults)
+asv_cmake_defaults( )
+###############
+
 SET(CC_SOURCE_DIR ${CMAKE_CURRENT_SOURCE_DIR})
 SET(CC_BINARY_DIR ${CMAKE_CURRENT_BINARY_DIR})
 
