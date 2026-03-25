@@ -482,6 +482,36 @@ ENDIF()
 IF(WIN32 AND WITH_MSI AND CMAKE_BUILD_TYPE STREQUAL "RelWithDebInfo")
   ADD_SUBDIRECTORY(win/packaging)
 ENDIF()
+
+# -----------------------
+# CMake package config export
+# -----------------------
+INSTALL(EXPORT ${PROJECT_NAME}Targets
+    FILE ${PROJECT_NAME}Targets.cmake
+    NAMESPACE ${PROJECT_NAME}::
+    DESTINATION lib/cmake/${PROJECT_NAME}
+)
+
+INCLUDE(CMakePackageConfigHelpers)
+
+WRITE_BASIC_PACKAGE_VERSION_FILE(
+  "${CMAKE_CURRENT_BINARY_DIR}/${PROJECT_NAME}ConfigVersion.cmake"
+  VERSION       ${CPACK_PACKAGE_VERSION}
+  COMPATIBILITY SameMajorVersion
+)
+
+CONFIGURE_PACKAGE_CONFIG_FILE(
+  "${CMAKE_CURRENT_SOURCE_DIR}/${PROJECT_NAME}Config.cmake.in"
+  "${CMAKE_CURRENT_BINARY_DIR}/${PROJECT_NAME}Config.cmake"
+  INSTALL_DESTINATION lib/cmake/${PROJECT_NAME}
+)
+
+INSTALL(FILES
+  "${CMAKE_CURRENT_BINARY_DIR}/${PROJECT_NAME}Config.cmake"
+  "${CMAKE_CURRENT_BINARY_DIR}/${PROJECT_NAME}ConfigVersion.cmake"
+  DESTINATION lib/cmake/${PROJECT_NAME}
+)
+
 MESSAGE1(SYSTEM_PROCESSOR "SYSTEM processor: ${CMAKE_SYSTEM_PROCESSOR}")
 SET(CPACK_PACKAGE_VENDOR "MariaDB Corporation Ab")
 SET(CPACK_PACKAGE_DESCRIPTION "MariaDB Connector/C. A library for connecting to MariaDB and MySQL servers")
