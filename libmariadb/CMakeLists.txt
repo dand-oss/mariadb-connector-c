@@ -414,6 +414,9 @@ IF(WIN32)
                    "FILE_DESCRIPTION:Dynamic lib for client/server communication")
 ENDIF()
 
+# Always build the static library — unit tests link against it to access
+# internal symbols that are hidden in the shared library's version script.
+# WITH_STATIC_LIB only controls whether the static lib is installed.
 ADD_LIBRARY(mariadbclient STATIC  ${MARIADB_OBJECTS} ${EMPTY_FILE})
 TARGET_LINK_LIBRARIES(mariadbclient ${SYSTEM_LIBS} ${CRYPT_LIBS})
 
@@ -439,12 +442,12 @@ IF(CMAKE_SYSTEM_NAME MATCHES "Linux" OR
 ENDIF()
 
 SET_TARGET_PROPERTIES(mariadbclient PROPERTIES IMPORTED_INTERFACE_LINK_LIBRARIES "${SYSTEM_LIBS}")
-SET_TARGET_PROPERTIES(libmariadb PROPERTIES IMPORTED_INTERFACE_LINK_LIBRARIES "${SYSTEM_LIBS}")
-
-# Export include directories for consumers via find_package()
 TARGET_INCLUDE_DIRECTORIES(mariadbclient PUBLIC
     $<INSTALL_INTERFACE:${INSTALL_INCLUDEDIR}>
 )
+SET_TARGET_PROPERTIES(libmariadb PROPERTIES IMPORTED_INTERFACE_LINK_LIBRARIES "${SYSTEM_LIBS}")
+
+# Export include directories for consumers via find_package()
 TARGET_INCLUDE_DIRECTORIES(libmariadb PUBLIC
     $<INSTALL_INTERFACE:${INSTALL_INCLUDEDIR}>
 )
@@ -463,14 +466,14 @@ INCLUDE(${CC_SOURCE_DIR}/cmake/symlink.cmake)
 IF(WITH_MYSQLCOMPAT)
   create_symlink(libmysqlclient${CMAKE_SHARED_LIBRARY_SUFFIX} libmariadb ${INSTALL_LIBDIR})
   create_symlink(libmysqlclient_r${CMAKE_SHARED_LIBRARY_SUFFIX} libmariadb ${INSTALL_LIBDIR})
-  IF(NOT CMAKE_SYSTEM_NAME MATCHES AIX)
+  IF(WITH_STATIC_LIB AND NOT CMAKE_SYSTEM_NAME MATCHES AIX)
     create_symlink(libmysqlclient${CMAKE_STATIC_LIBRARY_SUFFIX} mariadbclient ${INSTALL_LIBDIR})
     create_symlink(libmysqlclient_r${CMAKE_STATIC_LIBRARY_SUFFIX} mariadbclient ${INSTALL_LIBDIR})
   ENDIF()
 ENDIF()
 
 # In DEB layout, mariadbclient is already named libmariadb.a — skip the symlink.
-IF(NOT INSTALL_LAYOUT STREQUAL "DEB")
+IF(WITH_STATIC_LIB AND NOT INSTALL_LAYOUT STREQUAL "DEB")
   create_symlink(libmariadb${CMAKE_STATIC_LIBRARY_SUFFIX} mariadbclient ${INSTALL_LIBDIR})
 ENDIF()
 
@@ -482,10 +485,12 @@ IF(NOT WIN32)
   SET_TARGET_PROPERTIES(mariadbclient PROPERTIES OUTPUT_NAME "${LIBMARIADB_STATIC_NAME}")
 ENDIF()
 
+IF(WITH_STATIC_LIB)
 INSTALL(TARGETS mariadbclient
           EXPORT ${PROJECT_NAME}Targets
           COMPONENT Development
           DESTINATION ${INSTALL_LIBDIR})
+ENDIF()
 IF(WIN32)
 INSTALL(TARGETS libmariadb
         EXPORT ${PROJECT_NAME}Targets
