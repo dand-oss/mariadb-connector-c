@@ -38,6 +38,7 @@ ADD_OPTION(WITH_TOOLS
            OFF)
 
 ADD_OPTION(RUN_UNSTABLE_TESTS "Run unstable tests" OFF)
+ADD_OPTION(WITH_STATIC_LIB "Build static library" OFF)
 
 IF(WITH_BOOST_CONTEXT)
   PROJECT(mariadb-connector-c LANGUAGES C CXX)
@@ -54,6 +55,11 @@ asv_cmake_defaults( )
 
 SET(CC_SOURCE_DIR ${CMAKE_CURRENT_SOURCE_DIR})
 SET(CC_BINARY_DIR ${CMAKE_CURRENT_BINARY_DIR})
+
+# Tests always link against static lib (they access internal symbols not
+# exported from the shared library).  The static lib is always built;
+# WITH_STATIC_LIB only controls whether it is installed.
+SET(MARIADB_CLIENT_LIB mariadbclient)
 
 SET(CPACK_PACKAGE_VERSION_MAJOR 3)
 SET(CPACK_PACKAGE_VERSION_MINOR 4)
