@@ -77,7 +77,7 @@ IF(${RUN_TLS})
                  ${CC_BINARY_DIR}/unittest/libmariadb/tls.c)
 
   ADD_EXECUTABLE(tls ${CC_BINARY_DIR}/unittest/libmariadb/tls.c)
-  TARGET_LINK_LIBRARIES(tls cctap ma_getopt mariadbclient)
+  TARGET_LINK_LIBRARIES(tls cctap ma_getopt ${MARIADB_CLIENT_LIB})
   ADD_TEST(tls ${EXECUTABLE_OUTPUT_PATH}/tls)
 ENDIF()
 
@@ -85,7 +85,7 @@ FOREACH(API_TEST ${API_TESTS})
   IF (NOT TARGET ${API_TEST})
     ADD_EXECUTABLE(${API_TEST} ${API_TEST}.c)
   ENDIF()
-  TARGET_LINK_LIBRARIES(${API_TEST} cctap ma_getopt mariadbclient)
+  TARGET_LINK_LIBRARIES(${API_TEST} cctap ma_getopt ${MARIADB_CLIENT_LIB})
   ADD_TEST(${API_TEST} ${EXECUTABLE_OUTPUT_PATH}/${API_TEST})
   IF(${API_TEST} STREQUAL "cursor" OR ${API_TEST} STREQUAL "ps_new")
     SET_TESTS_PROPERTIES(${API_TEST} PROPERTIES TIMEOUT 360)
@@ -97,7 +97,7 @@ ENDFOREACH(API_TEST)
 
 FOREACH(API_TEST ${MANUAL_TESTS})
   ADD_EXECUTABLE(${API_TEST} ${API_TEST}.c)
-  TARGET_LINK_LIBRARIES(${API_TEST} cctap ma_getopt mariadbclient)
+  TARGET_LINK_LIBRARIES(${API_TEST} cctap ma_getopt ${MARIADB_CLIENT_LIB})
 ENDFOREACH()
 
 SET(ADDITIONAL_FILES "tls_server.py" "certs/server-cert.pem"
