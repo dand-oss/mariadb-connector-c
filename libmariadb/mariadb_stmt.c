@@ -1409,7 +1409,15 @@ my_bool STDCALL mysql_stmt_bind_result(MYSQL_STMT *stmt, MYSQL_BIND *bind)
     if (!stmt->bind[i].error)
       stmt->bind[i].error= &stmt->bind[i].error_value;
 
+    if (mysql_ps_fetch_functions[stmt->bind[i].buffer_type].pack_len >= 0)
+    {
+      *stmt->bind[i].length= stmt->bind[i].length_value= mysql_ps_fetch_functions[stmt->bind[i].buffer_type].pack_len;
+    } else {
+      *stmt->bind[i].length= stmt->bind[i].length_value= 0;
+    }
+
     /* set length values for numeric types */
+/*
     switch(bind[i].buffer_type) {
     case MYSQL_TYPE_NULL:
       *stmt->bind[i].length= stmt->bind[i].length_value= 0;
@@ -1439,6 +1447,7 @@ my_bool STDCALL mysql_stmt_bind_result(MYSQL_STMT *stmt, MYSQL_BIND *bind)
     default:
       break;
     }
+*/
   }
   stmt->bind_result_done= 1;
   CLEAR_CLIENT_STMT_ERROR(stmt);
