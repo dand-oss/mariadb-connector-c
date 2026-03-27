@@ -516,7 +516,8 @@ IF(WIN32)
 INSTALL(TARGETS libmariadb
         EXPORT ${PROJECT_NAME}Targets
         COMPONENT SharedLibraries
-        DESTINATION ${INSTALL_LIBDIR})
+        RUNTIME DESTINATION ${INSTALL_BINDIR}
+        ARCHIVE DESTINATION ${INSTALL_LIBDIR})
 ELSE()
 INSTALL(TARGETS libmariadb
         EXPORT ${PROJECT_NAME}Targets
@@ -525,8 +526,8 @@ INSTALL(TARGETS libmariadb
 ENDIF()
 
 IF(MSVC)
-   # On Windows, install PDB
-   INSTALL(FILES $<TARGET_PDB_FILE:libmariadb> DESTINATION "${INSTALL_LIBDIR}"
+   # On Windows, install PDB next to DLL
+   INSTALL(FILES $<TARGET_PDB_FILE:libmariadb> DESTINATION "${INSTALL_BINDIR}"
            CONFIGURATIONS Debug RelWithDebInfo
            COMPONENT Development)
 ENDIF()
