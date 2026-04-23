@@ -763,7 +763,6 @@ mariadb_rpl_extract_rows(MARIADB_RPL *rpl,
 
           if (pos + 4 > end)
             goto malformed_packet;
-
           column->val.ts.second= myisam_uint4korr(pos);
           pos+= 4;
 
