@@ -82,6 +82,8 @@ else()
         OUTPUT_VARIABLE GSSAPI_INCS
         OUTPUT_STRIP_TRAILING_WHITESPACE)
     string(REGEX REPLACE "(\r?\n)+$" "" GSSAPI_INCS "${GSSAPI_INCS}")
+    # MIT krb5-config may emit "-isystem /path"; normalize to "-I/path" first
+    string(REGEX REPLACE "-isystem +" "-I" GSSAPI_INCS "${GSSAPI_INCS}")
     string(REGEX REPLACE " *-I" ";" GSSAPI_INCS "${GSSAPI_INCS}")
 
     execute_process(
