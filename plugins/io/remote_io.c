@@ -247,11 +247,11 @@ static int fill_buffer(MA_FILE *file, size_t want)
 }
  
 /* use to remove want bytes from the front of a files buffer */ 
-static int use_buffer(MA_FILE *file,int want)
+static int use_buffer(MA_FILE *file, size_t want)
 {
   MA_REMOTE_FILE *rf= (MA_REMOTE_FILE *)file->ptr;
-  /* sort out buffer */ 
-  if((rf->offset - want) <=0) {
+  /* sort out buffer */
+  if(rf->offset <= want) {
     /* ditch buffer - write will recreate */ 
     if (rf->buffer)
       free(rf->buffer);
