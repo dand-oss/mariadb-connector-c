@@ -325,6 +325,7 @@ static uint8_t ma_rpl_get_second_part(MYSQL_TIME *tm, uchar *ptr, uchar *metadat
       tm->second_part= myisam_sint3korr(ptr);
       return 3;
     default:
+      tm->second_part= 0;
       return 0;
   }
 }
@@ -510,7 +511,7 @@ mariadb_rpl_extract_rows(MARIADB_RPL *rpl,
         }
         case MYSQL_TYPE_TIMESTAMP2:
         {
-          MYSQL_TIME tm;
+          MYSQL_TIME tm= {0};
           column->val.ts.second= myisam_uint4korr(pos);
           pos+= 4;
           pos+= ma_rpl_get_second_part(&tm, pos, metadata);
