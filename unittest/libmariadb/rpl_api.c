@@ -181,7 +181,7 @@ static int test_rpl_semisync(MYSQL *my __attribute__((unused)))
 
 static int test_conc467(MYSQL *my __attribute__((unused)))
 {
-  MYSQL *mysql= mysql_init(NULL);
+  MYSQL *mysql;
   MARIADB_RPL_EVENT *event= NULL;
   MARIADB_RPL *rpl;
   int rc;
@@ -198,6 +198,7 @@ static int test_conc467(MYSQL *my __attribute__((unused)))
     return SKIP;
   }
 
+  mysql= mysql_init(NULL);
   if (!my_test_connect(mysql, hostname, username,
                              password, schema, port, socketname, 0))
   {
@@ -328,7 +329,7 @@ static int test_conc592(MYSQL *my __attribute__((unused)))
 
 static int test_conc815(MYSQL *my __attribute__((unused)))
 {
-  MYSQL *mysql= mysql_init(NULL);
+  MYSQL *mysql;
   MYSQL_RES *result;
   MYSQL_ROW row;
   MARIADB_RPL_EVENT *event= NULL,
@@ -352,6 +353,7 @@ static int test_conc815(MYSQL *my __attribute__((unused)))
     return SKIP;
   }
 
+  mysql= mysql_init(NULL);
   if (!my_test_connect(mysql, hostname, username,
                              password, schema, port, socketname, 0))
   {
