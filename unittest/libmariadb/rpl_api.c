@@ -70,7 +70,7 @@ static uint32_t get_binlog_position(MYSQL *mysql, char *filename)
 
 static int test_rpl_async(MYSQL *my __attribute__((unused)))
 {
-  MYSQL *mysql= mysql_init(NULL);
+  MYSQL *mysql;
   MARIADB_RPL_EVENT *event= NULL;
   MARIADB_RPL *rpl;
 
@@ -86,6 +86,7 @@ static int test_rpl_async(MYSQL *my __attribute__((unused)))
     return SKIP;
   }
 
+  mysql = mysql_init(NULL);
   if (!my_test_connect(mysql, hostname, username,
                              password, schema, port, socketname, 0))
   {
@@ -118,7 +119,7 @@ static int test_rpl_async(MYSQL *my __attribute__((unused)))
 
 static int test_rpl_semisync(MYSQL *my __attribute__((unused)))
 {
-  MYSQL *mysql= mysql_init(NULL);
+  MYSQL *mysql;
   MARIADB_RPL_EVENT *event= NULL;
   MARIADB_RPL *rpl;
 
@@ -134,7 +135,7 @@ static int test_rpl_semisync(MYSQL *my __attribute__((unused)))
     return SKIP;
   }
 
-
+  mysql= mysql_init(NULL);
   if (!my_test_connect(mysql, hostname, username,
                              password, schema, port, socketname, 0))
   {
@@ -246,16 +247,12 @@ static int test_conc467(MYSQL *my __attribute__((unused)))
 static int test_conc592(MYSQL *my __attribute__((unused)))
 {
   MARIADB_RPL *rpl;
-  MYSQL *mysql= mysql_init(NULL);
-  MYSQL *mysql_check= mysql_init(NULL);
+  MYSQL *mysql, *mysql_check;
   const char *host= "myhost";
   MYSQL_RES *result;
   MYSQL_ROW row;
   int rc;
   int found= 0;
-
-
-  mysql_optionsv(mysql, MARIADB_OPT_RPL_REGISTER_REPLICA, host, 123);
 
   SKIP_SKYSQL;
   SKIP_MAXSCALE;
@@ -269,6 +266,8 @@ static int test_conc592(MYSQL *my __attribute__((unused)))
     return SKIP;
   }
 
+  mysql= mysql_init(NULL);
+  mysql_optionsv(mysql, MARIADB_OPT_RPL_REGISTER_REPLICA, host, 123);
 
   if (!my_test_connect(mysql, hostname, username,
                              password, schema, port, socketname, 0))
@@ -277,6 +276,8 @@ static int test_conc592(MYSQL *my __attribute__((unused)))
     mysql_close(mysql);
     return FAIL;
   }
+
+  mysql_check= mysql_init(NULL);
 
   if (!my_test_connect(mysql_check, hostname, username,
                              password, schema, port, socketname, 0))
@@ -444,13 +445,13 @@ end:
 
 struct my_tests_st my_tests[] = {
   /* His test needs to be run first */
-  {"test_binlog_available", test_binlog_available, TEST_CONNECTION_NEW, 0, NULL, NULL},
+  {"test_binlog_available", test_binlog_available, TEST_CONNECTION_DEFAULT, 0, NULL, NULL},
 
-  {"test_rpl_async", test_rpl_async, TEST_CONNECTION_NEW, 0, NULL, NULL},
-  {"test_rpl_semisync", test_rpl_semisync, TEST_CONNECTION_NEW, 0, NULL, NULL},
-  {"test_conc815", test_conc815, TEST_CONNECTION_NEW, 0, NULL, NULL},
-  {"test_conc592", test_conc592, TEST_CONNECTION_NEW, 0, NULL, NULL},
-  {"test_conc467", test_conc467, TEST_CONNECTION_NEW, 0, NULL, NULL},
+  {"test_rpl_async", test_rpl_async, TEST_CONNECTION_NONE, 0, NULL, NULL},
+  {"test_rpl_semisync", test_rpl_semisync, TEST_CONNECTION_NONE, 0, NULL, NULL},
+  {"test_conc815", test_conc815, TEST_CONNECTION_NONE, 0, NULL, NULL},
+  {"test_conc592", test_conc592, TEST_CONNECTION_NONE, 0, NULL, NULL},
+  {"test_conc467", test_conc467, TEST_CONNECTION_NONE, 0, NULL, NULL},
   {NULL, NULL, 0, 0, NULL, NULL}
 };
 
