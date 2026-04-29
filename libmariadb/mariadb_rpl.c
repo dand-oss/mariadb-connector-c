@@ -325,6 +325,7 @@ static uint8_t ma_rpl_get_second_part(MYSQL_TIME *tm, uchar *ptr, uchar *metadat
       tm->second_part= myisam_sint3korr(ptr);
       return 3;
     default:
+      tm->second_part= 0;
       return 0;
   }
 }
@@ -1383,7 +1384,7 @@ MARIADB_RPL_EVENT * STDCALL mariadb_rpl_fetch(MARIADB_RPL *rpl, MARIADB_RPL_EVEN
            byte<n>   column_types[column_count], 1 byte for
                      each column
            int<lenc> meta_data_size
-           byte<n>   netadata{metadata_size]
+           byte<n>   netadata[metadata_size]
            byte<n>   bit fields, indicating which column can be null
                      n= (column_count + 7) / 8;
 
@@ -1434,8 +1435,8 @@ MARIADB_RPL_EVENT * STDCALL mariadb_rpl_fetch(MARIADB_RPL *rpl, MARIADB_RPL_EVEN
         rpl_parse_opt_metadata(rpl_event, ev, len);
         ev+= len;
       }
-
-      break;
+    }
+    break;
 
     case RAND_EVENT:
       RPL_CHECK_POS(ev, ev_end, 16);
@@ -1445,7 +1446,6 @@ MARIADB_RPL_EVENT * STDCALL mariadb_rpl_fetch(MARIADB_RPL *rpl, MARIADB_RPL_EVEN
       ev+= 8;
 
       break;
-    }
 
     case INTVAR_EVENT:
       RPL_CHECK_POS(ev, ev_end, 9);
@@ -1888,6 +1888,9 @@ MARIADB_RPL_EVENT * STDCALL mariadb_rpl_fetch(MARIADB_RPL *rpl, MARIADB_RPL_EVEN
       }
       return rpl_event;
     }
+
+    /* Safe guard */
+    RPL_CHECK_POS(ev, ev_end, 0);
 
     /* check if we have to send acknowledgement to primary
        when semi sync replication is used */
