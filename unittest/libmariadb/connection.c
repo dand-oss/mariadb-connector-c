@@ -2166,6 +2166,9 @@ static int test_conn_str_1(MYSQL *my __attribute__((unused)))
   FILE *fp;
   int rc;
   char conn_str[1024];
+  
+  SKIP_MAXSCALE;
+
   mysql= mysql_init(NULL);
 
   if (!(fp= fopen("./conc274.cnf", "w")))
