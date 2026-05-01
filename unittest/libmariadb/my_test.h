@@ -85,10 +85,10 @@ if (force_tls)\
 
 MYSQL *mysql_default = NULL;  /* default connection */
 
-#define IS_MAXSCALE()\
-   ((mysql_default && strstr(mysql_get_server_info(mysql_default), "maxScale")) ||\
-    (getenv("srv")!=NULL && (strcmp(getenv("srv"), "maxscale") == 0 ||\
-     strcmp(getenv("srv"), "skysql-ha") == 0)))
+#define IS_MAXSCALE() \
+   ((mysql_default && strstr(mysql_get_server_info(mysql_default), "maxScale")) || \
+    (getenv("srv") != NULL && strcmp(getenv("srv"), "maxscale") == 0) || \
+    (getenv("MAXSCALE_TAG") != NULL && strlen(getenv("MAXSCALE_TAG")) > 0))
 
 #define SKIP_MAXSCALE \
 if (IS_MAXSCALE()) \
@@ -133,9 +133,9 @@ if (!((mysql->server_capabilities & CLIENT_LOCAL_FILES) &&  \
 
 #define SKIP_TRAVIS()\
 do {\
-  if (getenv("TRAVIS"))\
+  if (getenv("TRAVIS") || getenv("GITHUB_ACTIONS"))\
   {\
-    diag("Skip test on Travis CI");\
+    diag("Skip test on Travis CI or GitHub Actions");\
     return SKIP;\
   }\
 }while(0)
