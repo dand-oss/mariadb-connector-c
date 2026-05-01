@@ -650,7 +650,11 @@ int test_conc21(MYSQL *mysql)
 
 int test_conc26(MYSQL *unused __attribute__((unused)))
 {
-  MYSQL *mysql= mysql_init(NULL);
+  MYSQL *mysql;
+
+  SKIP_MAXSCALE;
+
+  mysql= mysql_init(NULL);
   mysql_options(mysql, MYSQL_SET_CHARSET_NAME, "ascii");
 
   FAIL_IF(my_test_connect(mysql, hostname, "notexistinguser", "password", schema, port, socketname, CLIENT_REMEMBER_OPTIONS, 1),
