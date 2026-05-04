@@ -86,7 +86,7 @@ if (force_tls || fingerprint[0])\
 MYSQL *mysql_default = NULL;  /* default connection */
 
 #define IS_MAXSCALE_ENV() \
-    (getenv("srv") != NULL && strcmp(getenv("srv"), "maxscale") == 0 || \
+    ((getenv("srv") != NULL && strcmp(getenv("srv"), "maxscale") == 0) || \
     (getenv("MAXSCALE_TAG") != NULL && strlen(getenv("MAXSCALE_TAG")) > 0))
 
 #define IS_MAXSCALE()\
