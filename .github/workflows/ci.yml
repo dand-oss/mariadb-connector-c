@@ -163,10 +163,30 @@ jobs:
         shell: bash
         run: |
           cd unittest/libmariadb
-          ctest -V
+          ctest -V --output-on-failure
         env:
           MARIADB_CC_TEST: 1
           MYSQL_TEST_TLS: 0
+          MYSQL_TEST_SSL_PORT: ${{ env.TEST_MAXSCALE_TLS_PORT }}
           srv: ${{ matrix.db-type }}
           MAXSCALE_TAG: ${{ matrix.maxscale-tag || '' }}
           MARIADB_PLUGIN_DIR: ${{ github.workspace }}
+
+      - name: MaxScale logs on failure
+        if: ${{ failure() && matrix.maxscale-tag != '' && !startsWith(matrix.os, 'windows') }}
+        shell: bash
+        run: |
+          echo "============================="
+          echo "=== MaxScale container(s) ==="
+          echo "============================="
+          podman ps -a --filter "name=maxscale" --format '{{.Names}} {{.Image}} {{.Status}}' || true
+
+          for c in $(podman ps -a --filter "name=maxscale" --format '{{.Names}}'); do
+            echo ""
+            echo "=== podman logs: $c ==="
+            podman logs "$c" 2>&1 | tail -n 500 || true
+
+            echo ""
+            echo "=== /var/log/maxscale/maxscale.log in $c ==="
+            podman exec "$c" sh -c 'tail -n 500 /var/log/maxscale/maxscale.log 2>/dev/null || cat /var/log/maxscale/maxscale.log 2>/dev/null' || true
+          done

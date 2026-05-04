@@ -679,10 +679,10 @@ MYSQL *my_test_connect(MYSQL *mysql,
     mysql_options(mysql, MARIADB_OPT_SSL_FP, fingerprint);
   }
 
-  if (IS_MAXSCALE_ENV())
+  if (IS_MAXSCALE_ENV() && host && hostname && strcmp(host, hostname) == 0)
   {
     mysql_get_optionv(mysql, MYSQL_OPT_SSL_VERIFY_SERVER_CERT, &verify);
-    if (force_tls || verify)
+    if (force_tls || verify || mysql->options.use_ssl)
       port= ssl_port;
   }
 
@@ -718,7 +718,8 @@ void run_tests(struct my_tests_st *test) {
   mysql_options(mysql, MYSQL_OPT_SSL_VERIFY_SERVER_CERT, &verify);
   mysql_ssl_set(mysql, NULL, NULL, NULL, NULL, NULL);
 
-  if (!mysql_real_connect(mysql, hostname, username, password, schema, port, socketname, 0))
+  if (!mysql_real_connect(mysql, hostname, username, password, schema,
+                          IS_MAXSCALE_ENV() ? ssl_port : port, socketname, 0))
   {
     diag("Error: %s", mysql_error(mysql));
     BAIL_OUT("Can't establish TLS connection to server.");

@@ -2141,7 +2141,7 @@ static int test_conn_str(MYSQL *my __attribute__((unused)))
   snprintf(conn_str, sizeof(conn_str)-1, "host=%s;user=%s;password={%s};port=%d;socket=%s;tls_fp=%s",
                 hostname ? hostname : "localhost", username ? username : "",
                 password ? password : "",
-                port, socketname ? socketname : "",
+                IS_MAXSCALE_ENV() ? ssl_port : port, socketname ? socketname : "",
                 fingerprint[0] ? fingerprint : "");
 
   /* SkySQL requires secure connection */
@@ -2215,6 +2215,8 @@ static int test_conc365(MYSQL *my __attribute__((unused)))
   int rc= OK;
   MYSQL *mysql= mysql_init(NULL);
   char tmp[1024];
+  
+  SKIP_MAXSCALE;
 
   snprintf(tmp, sizeof(tmp) - 1,
    "host=127.0.0.1:3300,%s;user=%s;password={%s};port=%d;socket=%s;tls_fp=%s",
@@ -2475,6 +2477,8 @@ static int test_parsec(MYSQL *my)
   int verify= 0;
   MYSQL *mysql;
   char query[1024];
+
+  SKIP_MAXSCALE;
 
   if (!is_mariadb)
   {
