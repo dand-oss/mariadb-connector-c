@@ -35,7 +35,7 @@ with this program; if not, write to the Free Software Foundation, Inc.,
 
 static int test_conc66(MYSQL *my)
 {
-  MYSQL *mysql= mysql_init(NULL);
+  MYSQL *mysql;
   int rc;
   FILE *fp;
   char query[1024];
@@ -60,16 +60,18 @@ static int test_conc66(MYSQL *my)
 
   fclose(fp);
 
-  rc= mysql_options(mysql, MYSQL_READ_DEFAULT_GROUP, "conc-66");
-  check_mysql_rc(rc, mysql);
-  rc= mysql_options(mysql, MYSQL_READ_DEFAULT_FILE, "./my-conc66-test.cnf");
-  check_mysql_rc(rc, mysql);
-
   sprintf(query, "GRANT ALL ON %s.* TO 'conc66'@'%s' IDENTIFIED BY 'test@A1\";#test'", schema, this_host ? this_host : "localhost");
   rc= mysql_query(my, query);
   check_mysql_rc(rc, my);
   rc= mysql_query(my, "FLUSH PRIVILEGES");
   check_mysql_rc(rc, my);
+  mysql= mysql_init(NULL);
+
+  rc= mysql_options(mysql, MYSQL_READ_DEFAULT_GROUP, "conc-66");
+  check_mysql_rc(rc, mysql);
+  rc= mysql_options(mysql, MYSQL_READ_DEFAULT_FILE, "./my-conc66-test.cnf");
+  check_mysql_rc(rc, mysql);
+
   if (!my_test_connect(mysql, hostname, NULL,
                              NULL, schema, port, socketname, 0, 1))
   {
@@ -77,7 +79,7 @@ static int test_conc66(MYSQL *my)
     diag("Error: %s", mysql_error(mysql));
     return FAIL;
   }
-    diag("user: %s", mysql->options.user);
+  diag("user: %s", mysql->options.user);
 
   sprintf(query, "DROP user 'conc66'@'%s'", this_host ? this_host : "localhost");
   rc= mysql_query(my, query);
@@ -483,8 +485,6 @@ static int test_opt_reconnect(MYSQL *mysql)
   int rc;
   my_bool reconnect;
 
-  printf("true: %d\n", TRUE);
-
   mysql= mysql_init(NULL);
   FAIL_IF(!mysql, "not enough memory");
 
@@ -682,6 +682,7 @@ int test_connection_timeout(MYSQL *unused __attribute__((unused)))
   if (my_test_connect(mysql, "192.168.1.101", "notexistinguser", "password", schema, port, socketname, CLIENT_REMEMBER_OPTIONS, 1))
   {
     diag("Error expected - maybe you have to change hostname");
+    mysql_close(mysql);
     return FAIL;
   }
   elapsed= time(NULL) - start;
@@ -712,6 +713,7 @@ int test_connection_timeout2(MYSQL *unused __attribute__((unused)))
   elapsed= time(NULL) - start;
   diag("elapsed: %lu", (unsigned long)elapsed);
     diag("timeout error expected");
+    mysql_close(mysql);
     return FAIL;
   }
   elapsed= time(NULL) - start;
@@ -738,6 +740,7 @@ int test_connection_timeout3(MYSQL *unused __attribute__((unused)))
     diag("timeout error expected");
     elapsed= time(NULL) - start;
     diag("elapsed: %lu", (unsigned long)elapsed);
+    mysql_close(mysql);
     return FAIL;
   }
   elapsed= time(NULL) - start;
@@ -753,6 +756,7 @@ int test_connection_timeout3(MYSQL *unused __attribute__((unused)))
   if (!my_test_connect(mysql, hostname, username, password, schema, port, socketname, CLIENT_REMEMBER_OPTIONS, 1))
   {
     diag("Error: %s", mysql_error(mysql));
+    mysql_close(mysql);
     return FAIL;
   }
 
@@ -2068,7 +2072,7 @@ static int test_conc490(MYSQL *my __attribute__((unused)))
 static int test_conc544(MYSQL *mysql)
 {
   int rc;
-  MYSQL *my= mysql_init(NULL);
+  MYSQL *my;
   char query[1024];
 
   SKIP_SKYSQL;
@@ -2086,6 +2090,8 @@ static int test_conc544(MYSQL *mysql)
     diag("feature not supported, ed25519 plugin not available");
     return SKIP;
   }
+
+  my= mysql_init(NULL);
 
   rc= mysql_optionsv(my, MARIADB_OPT_RESTRICTED_AUTH, "client_ed25519");
   check_mysql_rc(rc, mysql);
@@ -2170,7 +2176,7 @@ static int test_conn_str_1(MYSQL *my __attribute__((unused)))
   FILE *fp;
   int rc;
   char conn_str[1024];
-  
+
   SKIP_MAXSCALE;
 
   mysql= mysql_init(NULL);
@@ -2215,7 +2221,7 @@ static int test_conc365(MYSQL *my __attribute__((unused)))
   int rc= OK;
   MYSQL *mysql= mysql_init(NULL);
   char tmp[1024];
-  
+
   SKIP_MAXSCALE;
 
   snprintf(tmp, sizeof(tmp) - 1,
