@@ -118,8 +118,8 @@ extern my_bool mthd_stmt_read_prepare_response(MYSQL_STMT *stmt);
 extern my_bool mthd_stmt_get_param_metadata(MYSQL_STMT *stmt);
 extern my_bool mthd_stmt_get_result_metadata(MYSQL_STMT *stmt);
 extern int mthd_stmt_read_execute_response(MYSQL_STMT *stmt);
-extern int mthd_stmt_fetch_row(MYSQL_STMT *stmt, unsigned char **row);
-extern int mthd_stmt_fetch_to_bind(MYSQL_STMT *stmt, unsigned char *row);
+extern int mthd_stmt_fetch_row(MYSQL_STMT *stmt, unsigned char **row, ulong *length);
+extern int mthd_stmt_fetch_to_bind(MYSQL_STMT *stmt, unsigned char *row, ulong length);
 extern int mthd_stmt_read_all_rows(MYSQL_STMT *stmt);
 extern void mthd_stmt_flush_unbuffered(MYSQL_STMT *stmt);
 extern my_bool _mariadb_read_options(MYSQL *mysql, const char *dir, const char *config_file, const char *group, unsigned int recursion);
@@ -1975,7 +1975,7 @@ restart:
   {
     net->last_errno=CR_CANT_READ_CHARSET;
     sprintf(net->last_error,ER(net->last_errno),
-      mysql->options.charset_name ? mysql->options.charset_name : 
+      mysql->options.charset_name ? mysql->options.charset_name :
                                     MARIADB_DEFAULT_CHARSET,
       "compiled_in");
     goto error;
@@ -1993,7 +1993,7 @@ restart:
     if (!compression_plugin(net) ||
         (!(compression_ctx(net) = compression_plugin(net)->init_ctx(COMPRESSION_LEVEL_DEFAULT))))
     {
-      int alg= (mysql->client_flag & CLIENT_ZSTD_COMPRESSION) ? 
+      int alg= (mysql->client_flag & CLIENT_ZSTD_COMPRESSION) ?
                COMPRESSION_ZSTD : COMPRESSION_ZLIB;
       compression_plugin(net)= NULL;
       my_set_error(mysql, CR_ERR_LOAD_PLUGIN, SQLSTATE_UNKNOWN, NULL,
@@ -2610,7 +2610,7 @@ void ma_save_session_track_info(void *ptr, enum enum_mariadb_status_info type, .
 
 mem_error:
   SET_CLIENT_ERROR(mysql, CR_OUT_OF_MEMORY, SQLSTATE_UNKNOWN, 0);
-  return; 
+  return;
 }
 
 int ma_read_ok_packet(MYSQL *mysql, uchar *pos, ulong length)
@@ -2707,6 +2707,9 @@ int ma_read_ok_packet(MYSQL *mysql, uchar *pos, ulong length)
               /* in case schema has changed, we have to update mysql->db */
               if (si_type == SESSION_TRACK_SCHEMA)
               {
+                /* covers utf8mb3 and utf8mb4 */
+                if (plen > 256)
+                  goto corrupted;
                 free(mysql->db);
                 mysql->db= malloc(plen + 1);
                 memcpy(mysql->db, data1.str, data1.length);
@@ -2719,7 +2722,10 @@ int ma_read_ok_packet(MYSQL *mysql, uchar *pos, ulong length)
                 if (!strncmp(data1.str, "character_set_client", plen))
                   set_charset= 1;
                 plen= net_field_length(&pos);
-                if (ma_check_buffer_boundaries(mysql, pos, length, plen))
+
+                /* check boundaries before executing callback function */
+                if (ma_check_buffer_boundaries(mysql, pos, length, plen) ||
+                   (set_charset && plen >= CHARSET_NAME_LEN))
                   goto corrupted;
                 data2.str= (char *)pos;
                 data2.length= plen;
@@ -2731,7 +2737,7 @@ int ma_read_ok_packet(MYSQL *mysql, uchar *pos, ulong length)
                    goto oom;
 
                 pos+= plen;
-                if (set_charset && plen < CHARSET_NAME_LEN &&
+                if (set_charset &&
                     strncmp(mysql->charset->csname, data2.str, data2.length) != 0)
                 {
                   char cs_name[CHARSET_NAME_LEN];

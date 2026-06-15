@@ -1,15 +1,15 @@
 /* Copyright (C) 2000 MySQL AB & MySQL Finland AB & TCX DataKonsult AB
-   
+
    This library is free software; you can redistribute it and/or
    modify it under the terms of the GNU Library General Public
    License as published by the Free Software Foundation; either
    version 2 of the License, or (at your option) any later version.
-   
+
    This library is distributed in the hope that it will be useful,
    but WITHOUT ANY WARRANTY; without even the implied warranty of
    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
    Library General Public License for more details.
-   
+
    You should have received a copy of the GNU Library General Public
    License along with this library; if not, write to the Free
    Software Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
@@ -30,7 +30,7 @@
 #define strdup _strdup
 #define sleep(x) Sleep(1000*(x))
 #define strerror_r(errno,buf,len) strerror_s(buf,len,errno)
-#define STDCALL __stdcall 
+#define STDCALL __stdcall
 #endif
 
 #include <ma_config.h>
@@ -387,6 +387,8 @@ typedef SOCKET_SIZE_TYPE size_socket;
 
 	/* General constants */
 #define SC_MAXWIDTH	256	/* Max width of screen (for error messages) */
+#define MAX_ZEROFILL_LEN 255
+#define MAX_DECIMAL_LEN 67
 #define FN_LEN		256	/* Max file name len */
 #define FN_HEADLEN	253	/* Max length of filepart of file name */
 #define FN_EXTLEN	20	/* Max length of extension (part of FN_LEN) */
@@ -663,7 +665,7 @@ typedef off_t os_off_t;
 
 #if defined(_WIN32)
 #define socket_errno	WSAGetLastError()
-#define SOCKET_EINTR	WSAEINTR 
+#define SOCKET_EINTR	WSAEINTR
 #define SOCKET_EAGAIN	WSAEWOULDBLOCK
 #define SOCKET_ENFILE	ENFILE
 #define SOCKET_EMFILE	EMFILE
@@ -766,7 +768,7 @@ typedef char		bool;	/* Ordinary boolean values 0 1 */
 #else
 /*
    ATTENTION !
-   
+
     Please, note, uint3korr reads 4 bytes (not 3) !
     It means, that you have to provide enough allocated space !
 */
@@ -1075,9 +1077,9 @@ typedef unsigned long long intptr;
 #endif
 
 #ifdef _WIN32
-#define IF_WIN(A,B) A 
+#define IF_WIN(A,B) A
 #else
-#define IF_WIN(A,B) B 
+#define IF_WIN(A,B) B
 #endif
 
 #if defined(SOLARIS) || defined(__sun)
