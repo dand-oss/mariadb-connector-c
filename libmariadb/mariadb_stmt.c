@@ -466,7 +466,7 @@ int mthd_stmt_fetch_to_bind(MYSQL_STMT *stmt, unsigned char *row, ulong length)
 
       /* CONC-820: 1. Check sentinel */
       if (data_len > packet_left) {
-        snprintf(errmsg, sizeof(errmsg)-1, "Malformed packet: Column %d has length %lu, while remaining space is %lu bytes", i,data_len, packet_left);
+        snprintf(errmsg, sizeof(errmsg)-1, "Malformed packet: Column %d has length %lu, while remaining space is %zu bytes", i, data_len, packet_left);
         stmt_set_error(stmt, CR_MALFORMED_PACKET, SQLSTATE_UNKNOWN, errmsg);
         return MYSQL_DATA_MALFORMED;
       }

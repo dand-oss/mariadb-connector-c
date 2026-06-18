@@ -880,8 +880,8 @@ struct st_mariadb_methods {
   my_bool (*db_stmt_get_result_metadata)(MYSQL_STMT *stmt);
   my_bool (*db_stmt_get_param_metadata)(MYSQL_STMT *stmt);
   int (*db_stmt_read_all_rows)(MYSQL_STMT *stmt);
-  int (*db_stmt_fetch)(MYSQL_STMT *stmt, unsigned char **row, ulong *length);
-  int (*db_stmt_fetch_to_bind)(MYSQL_STMT *stmt, unsigned char *row, ulong length);
+  int (*db_stmt_fetch)(MYSQL_STMT *stmt, unsigned char **row, unsigned long *length);
+  int (*db_stmt_fetch_to_bind)(MYSQL_STMT *stmt, unsigned char *row, unsigned long length);
   void (*db_stmt_flush_unbuffered)(MYSQL_STMT *stmt);
   void (*set_error)(MYSQL *mysql, unsigned int error_nr, const char *sqlstate, const char *format, ...);
   void (*invalidate_stmts)(MYSQL *mysql, const char *function_name);
