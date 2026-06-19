@@ -2002,7 +2002,7 @@ restart:
   {
     net->last_errno=CR_CANT_READ_CHARSET;
     sprintf(net->last_error,ER(net->last_errno),
-      mysql->options.charset_name ? mysql->options.charset_name : 
+      mysql->options.charset_name ? mysql->options.charset_name :
                                     MARIADB_DEFAULT_CHARSET,
       "compiled_in");
     goto error;
@@ -2020,7 +2020,7 @@ restart:
     if (!compression_plugin(net) ||
         (!(compression_ctx(net) = compression_plugin(net)->init_ctx(COMPRESSION_LEVEL_DEFAULT))))
     {
-      int alg= (mysql->client_flag & CLIENT_ZSTD_COMPRESSION) ? 
+      int alg= (mysql->client_flag & CLIENT_ZSTD_COMPRESSION) ?
                COMPRESSION_ZSTD : COMPRESSION_ZLIB;
       compression_plugin(net)= NULL;
       my_set_error(mysql, CR_ERR_LOAD_PLUGIN, SQLSTATE_UNKNOWN, NULL,
@@ -2279,6 +2279,7 @@ my_bool	STDCALL mysql_change_user(MYSQL *mysql, const char *user,
        *s_passwd= mysql->passwd,
        *s_db= mysql->db;
   int rc;
+  unsigned char old_status= mysql->net.tls_verify_status;
 
   if (mysql->options.charset_name)
     mysql->charset= mysql_find_charset_name(mysql->options.charset_name);
@@ -2290,6 +2291,10 @@ my_bool	STDCALL mysql_change_user(MYSQL *mysql, const char *user,
 
   /* db will be set in run_plugin_auth */
   mysql->db= 0;
+
+  /* Do not check certificate again */
+  mysql->net.tls_verify_status = 0;
+
   rc= run_plugin_auth(mysql, 0, 0, 0, db);
 
   /* COM_CHANGE_USER always releases prepared statements, so we need to invalidate them */
@@ -2316,6 +2321,8 @@ my_bool	STDCALL mysql_change_user(MYSQL *mysql, const char *user,
     mysql->passwd= s_passwd;
     mysql->db= s_db;
     mysql->charset= s_cs;
+
+    mysql->net.tls_verify_status= old_status;
   }
   return(rc);
 }
@@ -2638,7 +2645,7 @@ void ma_save_session_track_info(void *ptr, enum enum_mariadb_status_info type, .
 
 mem_error:
   SET_CLIENT_ERROR(mysql, CR_OUT_OF_MEMORY, SQLSTATE_UNKNOWN, 0);
-  return; 
+  return;
 }
 
 int ma_read_ok_packet(MYSQL *mysql, uchar *pos, ulong length)

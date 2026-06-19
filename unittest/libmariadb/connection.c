@@ -2717,10 +2717,61 @@ static int test_conc760(MYSQL *my)
 }
 #endif
 
+static int test_conc626(MYSQL *mysql)
+{
+  int rc;
+  int verify= 1;
+  MYSQL *my= NULL;
+  int ret= FAIL;
+  char query[1024];
+
+  SKIP_MYSQL(mysql);
+
+  snprintf(query, sizeof(query) - 1, "DROP USER IF EXISTS foo1@'%s', foo2@'%s'", this_host, this_host);
+  rc= mysql_query(mysql, query);
+  check_mysql_err(rc, mysql);
+
+  snprintf(query, sizeof(query) - 1, "CREATE USER foo1@'%s' IDENTIFIED BY 'foo1passwd'", this_host);
+  rc= mysql_query(mysql, query);
+  check_mysql_err(rc, mysql);
+
+  snprintf(query, sizeof(query) - 1, "CREATE USER foo2@'%s' IDENTIFIED BY 'foo2passwd'", this_host);
+  rc= mysql_query(mysql, query);
+  check_mysql_err(rc, mysql);
+
+  my= mysql_init(NULL);
+
+  mysql_options(my, MYSQL_OPT_SSL_VERIFY_SERVER_CERT, &verify);
+
+  if (!my_test_connect(my, hostname, "foo1", "foo1passwd", NULL, port, socketname, 0, 0))
+  {
+    diag("Error: %s", mysql_error(my));
+    goto error;
+  }
+
+  rc= mysql_change_user(my, "foo2", "foo2passwd", NULL);
+  check_mysql_err(rc, my);
+
+  diag("Cipher in use: %s", mysql_get_ssl_cipher(my));
+
+  ret= OK;
+
+
+error:
+  snprintf(query, sizeof(query) - 1, "DROP USER IF EXISTS foo1@'%s', foo2@'%s'", this_host, this_host);
+  rc= mysql_query(mysql, query);
+  check_mysql_rc(rc, mysql);
+
+  if (my)
+    mysql_close(my);
+  return ret;
+}
+
 struct my_tests_st my_tests[] = {
 #ifdef WIN32
   {"test_conc760", test_conc760, TEST_CONNECTION_DEFAULT, 0, NULL, NULL},
 #endif
+  {"test_conc626", test_conc626, TEST_CONNECTION_DEFAULT, 0, NULL, NULL},
   {"test_conc589", test_conc589, TEST_CONNECTION_DEFAULT, 0, NULL, NULL},
   {"test_tls_timeout", test_tls_timeout, TEST_CONNECTION_NONE, 0, NULL, NULL},
   {"test_parsec", test_parsec, TEST_CONNECTION_DEFAULT, 0, NULL, NULL},
