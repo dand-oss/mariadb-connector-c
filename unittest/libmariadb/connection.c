@@ -2533,7 +2533,7 @@ static int test_parsec(MYSQL *my)
 int test_tls_timeout(MYSQL *unused __attribute__((unused)))
 {
   unsigned int connect_timeout= 5;
-  unsigned int read_write_timeout= 10;
+  unsigned int read_write_timeout= 1;
   int rc;
   time_t start, elapsed;
 
@@ -2549,10 +2549,10 @@ int test_tls_timeout(MYSQL *unused __attribute__((unused)))
   }
 
   start= time(NULL);
-  rc= mysql_query(mysql, "SET @a:=SLEEP(12)");
+  rc= mysql_query(mysql, "SET @a:=SLEEP(100)");
   elapsed= time(NULL) - start;
   diag("elapsed: %lu", (unsigned long)elapsed);
-  FAIL_IF((unsigned int)elapsed > read_write_timeout + 1, "timeout ignored");
+  FAIL_IF((unsigned int)elapsed > read_write_timeout + 5, "timeout ignored");
 
   FAIL_IF(!rc, "expected timeout error");
   diag("Error: %s", mysql_error(mysql));
@@ -2726,16 +2726,20 @@ static int test_conc626(MYSQL *mysql)
   char query[1024];
 
   SKIP_MYSQL(mysql);
-
+  if (mysql_get_server_version(mysql) < 110400)
+  {
+    diag("Test requires MariaDB Server version 11.4 or above");
+    return SKIP;
+  }
   snprintf(query, sizeof(query) - 1, "DROP USER IF EXISTS foo1@'%s', foo2@'%s'", this_host, this_host);
   rc= mysql_query(mysql, query);
   check_mysql_err(rc, mysql);
 
-  snprintf(query, sizeof(query) - 1, "CREATE USER foo1@'%s' IDENTIFIED BY 'foo1passwd'", this_host);
+  snprintf(query, sizeof(query) - 1, "CREATE USER foo1@'%s' IDENTIFIED BY 'heyPassw!20rd1'", this_host);
   rc= mysql_query(mysql, query);
   check_mysql_err(rc, mysql);
 
-  snprintf(query, sizeof(query) - 1, "CREATE USER foo2@'%s' IDENTIFIED BY 'foo2passwd'", this_host);
+  snprintf(query, sizeof(query) - 1, "CREATE USER foo2@'%s' IDENTIFIED BY 'heyPassw!20rd2'", this_host);
   rc= mysql_query(mysql, query);
   check_mysql_err(rc, mysql);
 
@@ -2743,13 +2747,13 @@ static int test_conc626(MYSQL *mysql)
 
   mysql_options(my, MYSQL_OPT_SSL_VERIFY_SERVER_CERT, &verify);
 
-  if (!my_test_connect(my, hostname, "foo1", "foo1passwd", NULL, port, socketname, 0, 0))
+  if (!my_test_connect(my, hostname, "foo1", "heyPassw!20rd1", NULL, port, socketname, 0, 0))
   {
     diag("Error: %s", mysql_error(my));
     goto error;
   }
 
-  rc= mysql_change_user(my, "foo2", "foo2passwd", NULL);
+  rc= mysql_change_user(my, "foo2", "heyPassw!20rd2", NULL);
   check_mysql_err(rc, my);
 
   diag("Cipher in use: %s", mysql_get_ssl_cipher(my));

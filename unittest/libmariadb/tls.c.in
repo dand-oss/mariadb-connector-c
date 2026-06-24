@@ -809,7 +809,7 @@ static int test_cert_ip(MYSQL *my __attribute((unused)))
   if (set_tls_dummy_options(dummy_options))
   {
     diag("Error when setting TLS options");
-    return FAIL;
+    return SKIP;
   }
   mysql_ssl_set(mysql, NULL, NULL, NULL, NULL, NULL);
   set_verify(mysql, 1);

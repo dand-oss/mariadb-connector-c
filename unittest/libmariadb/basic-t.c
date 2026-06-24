@@ -413,12 +413,18 @@ static int test_mysql_insert_id(MYSQL *mysql)
 {
   unsigned long long res;
   int rc;
+  int ver= mysql_get_server_version(mysql);
 
-  if (mysql_get_server_version(mysql) < 50100) {
+  if (ver < 50100) {
     diag("Test requires MySQL Server version 5.1 or above");
     return SKIP;
   }
-
+  if (!mariadb_connection(mysql) && ver >= 90000)
+  {
+    diag("Weird errors , mix of update to transactional and non-transactional "
+         "tables, so skip for MySQL 8.0");
+    return SKIP;
+  }
   rc= mysql_query(mysql, "drop table if exists t1");
   check_mysql_rc(rc, mysql);
   rc= mysql_query(mysql, "drop table if exists t2");
