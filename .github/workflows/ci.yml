@@ -120,6 +120,7 @@ jobs:
       MYSQL_TEST_DB: testc
 
     strategy:
+      fail-fast: false
       matrix: ${{ fromJSON(needs.setup.outputs.matrix) }}
 
     runs-on: ${{ matrix.os }}
