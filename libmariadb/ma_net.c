@@ -39,8 +39,6 @@
 #include <poll.h>
 #endif
 
-#define MAX_PACKET_LENGTH (256L*256L*256L-1)
-
 /* net_buffer_length and max_allowed_packet are defined in mysql.h
    See bug conc-57
  */
@@ -131,7 +129,7 @@ static my_bool net_realloc(NET *net, size_t length)
   pkt_length = (length+IO_SIZE-1) & ~(IO_SIZE-1);
   /* reallocate buffer:
      size= pkt_length + NET_HEADER_SIZE + COMP_HEADER_SIZE */
-  if (!(buff=(uchar*) realloc(net->buff, 
+  if (!(buff=(uchar*) realloc(net->buff,
           pkt_length + NET_HEADER_SIZE + COMP_HEADER_SIZE)))
   {
     net->error=1;
@@ -238,10 +236,10 @@ int ma_net_write_command(NET *net, uchar command,
   }
   int3store(buff,length);
   buff[3]= (net->compress) ? 0 :(uchar) (net->pkt_nr++);
-  rc= test (ma_net_write_buff(net,(char *)buff, buff_size) || 
+  rc= test (ma_net_write_buff(net,(char *)buff, buff_size) ||
       ma_net_write_buff(net,packet,len));
   if (!rc && !disable_flush)
-    return test(ma_net_flush(net)); 
+    return test(ma_net_flush(net));
   return rc;
 }
 
@@ -443,7 +441,7 @@ ulong ma_net_read(NET *net)
       size_t length= 0;
       ulong last_pos= net->where_b;
 
-      do 
+      do
       {
         length+= len;
         net->where_b+= (unsigned long)len;
@@ -461,7 +459,7 @@ ulong ma_net_read(NET *net)
   }
   else
   {
-    /* 
+    /*
        compressed protocol:
 
        --------------------------------------
@@ -521,7 +519,7 @@ ulong ma_net_read(NET *net)
           else
           {
             /* remove packet_header */
-            memmove(net->buff + current, 
+            memmove(net->buff + current,
                 net->buff + current + 4,
                 buffer_length - current);
             buffer_length-= 4;
@@ -547,7 +545,7 @@ ulong ma_net_read(NET *net)
         }
       }
       if (start)
-      { 
+      {
         memmove(net->buff, net->buff + start, buffer_length - start);
         /* decrease buflen and current */
         current -= start;
