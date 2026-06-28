@@ -6069,10 +6069,138 @@ static int test_conc762(MYSQL *mysql)
   return OK;
 }
 
+extern unsigned char *mysql_net_store_length(unsigned char *packet, ulonglong length);
+
+static int test_overflow(MYSQL *mysql)
+{
+  int rc;
+  MYSQL_STMT *stmt= mysql_stmt_init(mysql);
+  MYSQL_BIND bind[2];
+  char buf1[255], buf2[255];
+  uchar *p;
+
+  rc= mysql_query(mysql, "DROP TABLE IF EXISTS t1");
+  check_mysql_rc(rc, mysql);
+
+  rc= mysql_query(mysql, "CREATE TABLE t1 (a tinyint, b tinyint)");
+  check_mysql_rc(rc, mysql);
+
+  rc= mysql_query(mysql, "INSERT INTO t1 values (1,2)");
+  check_mysql_rc(rc, mysql);
+
+  rc= mysql_stmt_prepare(stmt, SL("SELECT a, b FROM t1"));
+  check_stmt_rc(rc, stmt);
+
+  memset(&bind, 0, sizeof(MYSQL_BIND) * 2);
+
+  bind[0].buffer_type = bind[1].buffer_type = MYSQL_TYPE_STRING;
+  bind[0].buffer_length= bind[1].buffer_length= 255;
+  bind[0].buffer= buf1;
+  bind[1].buffer= buf2;
+
+  rc= mysql_stmt_execute(stmt);
+  check_stmt_rc(rc, stmt);
+
+  rc= mysql_stmt_bind_result(stmt, bind);
+  check_stmt_rc(rc, stmt);
+
+  /* emulate malicious server and change data types */
+  stmt->fields[0].type= MYSQL_TYPE_LONGLONG;
+  stmt->fields[1].type= MYSQL_TYPE_LONGLONG;
+
+
+  rc= mysql_stmt_fetch(stmt);
+  FAIL_IF(rc != MYSQL_DATA_MALFORMED, "expected malformed data return value");
+  FAIL_IF(!mysql_stmt_errno(stmt), "expected statement error");
+
+  diag("expected error: %s", mysql_stmt_error(stmt));
+  mysql_stmt_close(stmt);
+
+  stmt= mysql_stmt_init(mysql);
+
+  rc= mysql_query(mysql, "DROP TABLE IF EXISTS t1");
+  check_mysql_rc(rc, mysql);
+
+  rc= mysql_query(mysql, "CREATE TABLE t1 (a text)");
+  check_mysql_rc(rc, mysql);
+
+  rc= mysql_query(mysql, "INSERT INTO t1 VALUES('this is the content of column a')");
+  check_mysql_rc(rc, mysql);
+
+  rc= mysql_stmt_prepare(stmt, SL("SELECT a FROM t1"));
+  check_stmt_rc(rc, stmt);
+
+  rc= mysql_stmt_execute(stmt);
+  check_stmt_rc(rc, stmt);
+
+  memset(&bind, 0, sizeof(MYSQL_BIND) * 2);
+
+  bind[0].buffer_type = MYSQL_TYPE_STRING;
+  bind[0].buffer_length= 255;
+  bind[0].buffer= buf1;
+
+  rc= mysql_stmt_bind_param(stmt, bind);
+  check_stmt_rc(rc, stmt);
+
+  rc= mysql_stmt_store_result(stmt);
+  check_stmt_rc(rc, stmt);
+
+  /* let's emulate malicious server and change length */
+  p= (uchar *)stmt->result_cursor->data;
+  p++;
+  p+= (stmt->field_count + 9) / 8;
+  mysql_net_store_length(p, 2000);
+
+  rc= mysql_stmt_fetch(stmt);
+  FAIL_IF(rc != MYSQL_DATA_MALFORMED, "expected malformed data return value");
+  FAIL_IF(!mysql_stmt_errno(stmt), "expected statement error");
+
+  diag("expected error: %s", mysql_stmt_error(stmt));
+
+  mysql_stmt_close(stmt);
+
+  stmt= mysql_stmt_init(mysql);
+
+  rc= mysql_query(mysql, "DROP TABLE IF EXISTS t1");
+  check_mysql_rc(rc, mysql);
+
+  rc= mysql_query(mysql, "CREATE TABLE t1 (a tinyint(255) zerofill)");
+  check_mysql_rc(rc, mysql);
+
+  rc= mysql_query(mysql, "INSERT INTO t1 VALUES(1)");
+  check_mysql_rc(rc, mysql);
+
+  rc= mysql_stmt_prepare(stmt, SL("SELECT a FROM t1"));
+  check_stmt_rc(rc, stmt);
+
+  rc= mysql_stmt_execute(stmt);
+  check_stmt_rc(rc, stmt);
+
+  bind[0].buffer_type = MYSQL_TYPE_STRING;
+  bind[0].buffer_length= 255;
+  bind[0].buffer= buf1;
+
+  rc= mysql_stmt_bind_param(stmt, bind);
+  check_stmt_rc(rc, stmt);
+
+  stmt->fields[0].length= 400;
+
+  rc= mysql_stmt_fetch(stmt);
+  FAIL_IF(rc != MYSQL_DATA_MALFORMED, "expected malformed data return value");
+  FAIL_IF(!mysql_stmt_errno(stmt), "expected statement error");
+
+  diag("expected error: %s", mysql_stmt_error(stmt));
+
+  mysql_stmt_close(stmt);
+  return OK;
+}
+
+
 
 struct my_tests_st my_tests[] = {
   {"test_conc683", test_conc683, TEST_CONNECTION_DEFAULT, 0, NULL, NULL},
   {"test_conc667", test_conc667, TEST_CONNECTION_DEFAULT, 0, NULL, NULL},
+  {"test_overflow", test_overflow, TEST_CONNECTION_NEW, 0, NULL, NULL},
   {"test_conc702", test_conc702, TEST_CONNECTION_DEFAULT, 0, NULL, NULL},
   {"test_conc762", test_conc762, TEST_CONNECTION_DEFAULT, 0, NULL, NULL},
   {"test_conc176", test_conc176, TEST_CONNECTION_DEFAULT, 0, NULL, NULL},

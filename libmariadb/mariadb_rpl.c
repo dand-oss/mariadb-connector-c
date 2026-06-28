@@ -119,7 +119,7 @@ void rpl_set_error(MARIADB_RPL *rpl,
 {
   va_list ap;
 
-  const char *errmsg;
+  const char *errmsg= NULL;
 
   if (!format)
   {
@@ -348,6 +348,7 @@ mariadb_rpl_extract_rows(MARIADB_RPL *rpl,
   uchar *start, *pos, *end;
   MARIADB_RPL_ROW *f_row= NULL, *p_row= NULL, *c_row= NULL;
   uint32_t column_count;
+  uchar *metadata_end;
 
   if (!rpl || !tm_event || !row_event)
     return NULL;
@@ -395,12 +396,13 @@ mariadb_rpl_extract_rows(MARIADB_RPL *rpl,
   }
 
   /* Create a strict ceiling boundary for metadata array parsing */
-  uchar *metadata_end = (uchar *)tm_event->event.table_map.metadata.str + tm_event->event.table_map.metadata.length;
+  metadata_end = (uchar *)tm_event->event.table_map.metadata.str + tm_event->event.table_map.metadata.length;
 
   while (pos < end)
   {
     uchar *n_bitmap;
     uint32_t i;
+    size_t bitmap_size;
 
     uchar *metadata= (uchar *)tm_event->event.table_map.metadata.str;
 
@@ -421,18 +423,19 @@ mariadb_rpl_extract_rows(MARIADB_RPL *rpl,
     n_bitmap= pos;
 
     /* Ensure null-bitmap footprint doesn't overshoot the row payload buffer */
-    size_t bitmap_size = (column_count + 7) / 8;
+     bitmap_size = (column_count + 7) / 8;
     if (pos + bitmap_size > end)
       goto malformed_packet;
     pos+= bitmap_size;
 
     for (i= 0; i < column_count; i++)
     {
+      MARIADB_RPL_VALUE *column;
       /* Prevent table_map column_types string read overflows */
       if (!tm_event->event.table_map.column_types.str || i >= tm_event->event.table_map.column_types.length)
         goto malformed_packet;
 
-      MARIADB_RPL_VALUE *column= &c_row->columns[i];
+      column= &c_row->columns[i];
       column->field_type= (uchar)tm_event->event.table_map.column_types.str[i];
 
       /* enum, set and string types are stored as string - first metadata
@@ -538,8 +541,6 @@ mariadb_rpl_extract_rows(MARIADB_RPL *rpl,
 
         case MYSQL_TYPE_NEWDECIMAL:
         {
-          if (metadata + 2 > metadata_end)
-            goto malformed_packet;
           uint8_t precision;
           uint8_t scale;
           uint32_t bin_size;
@@ -2098,9 +2099,10 @@ MARIADB_RPL_EVENT * STDCALL mariadb_rpl_fetch(MARIADB_RPL *rpl, MARIADB_RPL_EVEN
       */
       if (IS_ROW_VERSION2(rpl_event->event_type))
       {
+        size_t payload_size= 0;
+
         RPL_CHECK_POS(ev, ev_end, 2);
         rpl_event->event.rows.extra_data_size= uint2korr(ev);
-        uint16_t payload_size= 0;
 
         ev+= 2;
 
@@ -2161,7 +2163,7 @@ MARIADB_RPL_EVENT * STDCALL mariadb_rpl_fetch(MARIADB_RPL *rpl, MARIADB_RPL_EVEN
         if (ev + header_size > ev_end)
           goto malformed_packet;
 
-        source_len= ev_end - (ev + header_size);
+        source_len= (uLongf)(ev_end - (ev + header_size));
 
         if (!(rpl_event->event.rows.row_data = ma_calloc_root(&rpl_event->memroot, uncompressed_len)))
           goto mem_error;
