@@ -414,6 +414,8 @@ static int test_mysql_insert_id(MYSQL *mysql)
   unsigned long long res;
   int rc;
 
+  SKIP_MYSQL(mysql);
+
   if (mysql_get_server_version(mysql) < 50100) {
     diag("Test requires MySQL Server version 5.1 or above");
     return SKIP;
