@@ -2170,7 +2170,7 @@ MARIADB_RPL_EVENT * STDCALL mariadb_rpl_fetch(MARIADB_RPL *rpl, MARIADB_RPL_EVEN
         if (ev + header_size > ev_end)
           goto malformed_packet;
 
-        source_len= ev_end - (ev + header_size);
+        source_len= (uLongf)(ev_end - (ev + header_size));
 
         if (!(rpl_event->event.rows.row_data = ma_calloc_root(&rpl_event->memroot, uncompressed_len)))
           goto mem_error;
