@@ -2106,7 +2106,7 @@ MARIADB_RPL_EVENT * STDCALL mariadb_rpl_fetch(MARIADB_RPL *rpl, MARIADB_RPL_EVEN
       */
       if (IS_ROW_VERSION2(rpl_event->event_type))
       {
-        uint16_t payload_size= 0;
+        size_t payload_size= 0;
 
         RPL_CHECK_POS(ev, ev_end, 2);
         rpl_event->event.rows.extra_data_size= uint2korr(ev);
