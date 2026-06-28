@@ -1611,7 +1611,6 @@ MARIADB_RPL_EVENT * STDCALL mariadb_rpl_fetch(MARIADB_RPL *rpl, MARIADB_RPL_EVEN
         source_len= (uLongf)(len - header_size);
         dest_len= (uLongf)uncompressed_len;
 
-        len-= header_size;
         if (!(rpl_event->event.query.statement.str = ma_calloc_root(&rpl_event->memroot, uncompressed_len)))
           goto mem_error;
 
@@ -1743,12 +1742,6 @@ MARIADB_RPL_EVENT * STDCALL mariadb_rpl_fetch(MARIADB_RPL *rpl, MARIADB_RPL_EVEN
           decimal d;
           decimal_digit buf[10];
           size_t bin_size;
-
-
-          if (ev + 2 + bin_size > ev_end)
-          {
-            goto malformed_packet;
-          }
 
           if (ev + 2 > ev_end)
             goto malformed_packet;

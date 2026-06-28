@@ -2322,7 +2322,7 @@ dynamic_column_get_internal(DYNAMIC_COLUMN *str,
                             uint num_key, LEX_STRING *str_key)
 {
   DYN_HEADER header;
-  enum enum_dyncol_func_result rc= ER_DYNCOL_FORMAT;
+  enum enum_dyncol_func_result rc;
   memset(&header, 0, sizeof(header));
 
   if (str->length == 0)
@@ -3740,6 +3740,7 @@ mariadb_dyncol_check(DYNAMIC_COLUMN *str)
       }
     }
     prev_num= num;
+    (void)prev_num; /* make infer happy */
     prev_name= name;
     prev_data_offset= data_offset;
     prev_name_offset= name_offset;
@@ -4111,6 +4112,8 @@ mariadb_dyncol_json_internal(DYNAMIC_COLUMN *str, DYNAMIC_STRING *json,
   uint i;
   enum enum_dyncol_func_result rc;
 
+  memset(&header, 0, sizeof(header));
+
   if (lvl >= JSON_STACK_PROTECTION)
   {
     rc= ER_DYNCOL_RESOURCE;
@@ -4247,6 +4250,7 @@ mariadb_dyncol_unpack(DYNAMIC_COLUMN *str,
   enum enum_dyncol_func_result rc;
 
   *count= 0; *names= 0; *vals= 0;
+  memset(&header, 0, sizeof(header));
 
   if (str->length == 0)
     return ER_DYNCOL_OK;                      /* no columns */

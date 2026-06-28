@@ -1075,6 +1075,10 @@ MA_FIELD_EXTENSION *ma_field_extension_deep_dup(MA_MEM_ROOT *memroot,
 /***************************************************************************
 ** Change field rows to field structs
 ***************************************************************************/
+#if defined(offsetof)
+#undef OFFSET
+#define OFFSET(type,member) offsetof(type,member)
+#endif
 
 static size_t rset_field_offsets[]= {
   OFFSET(MYSQL_FIELD, catalog),
@@ -1177,8 +1181,9 @@ unpack_fields(const MYSQL *mysql,
     field->decimals= (uint) p[0];
     p++;
 
-    /* filler */
+    /* 2 bytes filler */
     p+= 2;
+    (void)p;
 
     if (INTERNAL_NUM_FIELD(field))
       field->flags|= NUM_FLAG;
@@ -2128,6 +2133,8 @@ my_bool STDCALL mariadb_reconnect(MYSQL *mysql)
   struct mysql_async_context *ctxt= NULL;
   LIST *li_stmt= mysql->stmts;
 
+  memset(&tmp_mysql, 0, sizeof(MYSQL));
+
   /* check if connection handler is active */
   if (IS_CONNHDLR_ACTIVE(mysql))
   {
@@ -2604,8 +2611,8 @@ void ma_save_session_track_info(void *ptr, enum enum_mariadb_status_info type, .
   case SESSION_TRACK_SYSTEM_VARIABLES:
     {
       LIST *session_item;
-      MYSQL_LEX_STRING *str;
-      char *tmp;
+      MYSQL_LEX_STRING *str= NULL;
+      char *tmp= NULL;
       MARIADB_CONST_STRING *data1= va_arg(ap, MARIADB_CONST_STRING *);
 
       if (!(session_item= ma_multi_malloc(0,
@@ -3617,6 +3624,7 @@ mysql_optionsv(MYSQL *mysql,enum mysql_option option, ...)
       if(!(mysql->options.extension= (struct st_mysql_options_extension *)
         calloc(1, sizeof(struct st_mysql_options_extension))))
       {
+        my_context_destroy(&ctxt->async_context);
         free(ctxt);
         SET_CLIENT_ERROR(mysql, CR_OUT_OF_MEMORY, SQLSTATE_UNKNOWN, 0);
         goto end;

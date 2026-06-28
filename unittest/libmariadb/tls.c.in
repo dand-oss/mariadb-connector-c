@@ -219,7 +219,6 @@ static int test_init(MYSQL *my __attribute__((unused)))
 {
   MYSQL *mysql= mysql_init(NULL);
   int rc;
-  int ret= FAIL;
   MYSQL_RES *result;
   MYSQL_ROW row;
 
@@ -248,10 +247,8 @@ static int test_init(MYSQL *my __attribute__((unused)))
   ignore_self_signed= ignore_self_signed_cert_error(mysql);
   diag("ignore self signed certificates: %d", ignore_self_signed);
 
-  ret= OK;
-
   mysql_close(mysql);
-  return ret;
+  return OK;
 }
 
 static int test_no_cert_check(MYSQL *my __attribute__((unused)))
