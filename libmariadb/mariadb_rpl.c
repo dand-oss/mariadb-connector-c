@@ -38,7 +38,9 @@
 #endif
 
 #define RPL_EVENT_HEADER_SIZE 19
-#define RPL_ERR_POS(r) (r)->filename_length, (r)->filename, (r)->start_position
+#define RPL_ERR_POS(r) (r)->filename ? (size_t)(r)->filename_length : (size_t)0, \
+                       (r)->filename ? (r)->filename : (const char *)"", \
+                       (long)(r)->start_position
 #define RPL_CHECK_NULL_POS(position, end)\
 {\
   uchar *tmp= (position);\
@@ -127,6 +129,11 @@ void rpl_set_error(MARIADB_RPL *rpl,
       errmsg= CER(error_nr);
     else
       errmsg= ER(CR_UNKNOWN_ERROR);
+  }
+
+  if (error_nr == CR_BINLOG_ERROR && (!rpl || !rpl->filename))
+  {
+    errmsg = "Binary log error: (No file context available). Details: %s";
   }
 
   rpl->error_no= error_nr;
@@ -265,6 +272,9 @@ static uint8_t rpl_alloc_set_string_and_len(MARIADB_RPL_EVENT *event,
                                             void *buffer,
                                             size_t len)
 {
+  if (!s)
+    return 0;
+
   if (!buffer || !len)
   {
     s->length= 0;
@@ -357,14 +367,35 @@ mariadb_rpl_extract_rows(MARIADB_RPL *rpl,
   if (!row_event->event.rows.row_data_size ||
       !row_event->event.rows.row_data)
   {
-    rpl_set_error(rpl, CR_BINLOG_ERROR, 0, "Row event has no data.");
+    rpl_set_error(rpl, CR_BINLOG_ERROR, 0, RPL_ERR_POS(rpl), "Row event has no data.");
     return NULL;
   }
 
   column_count= tm_event->event.table_map.column_count;
 
+  /* Protect against integer multiplication overflow and OOM loops */
+  if (column_count == 0 || column_count > 0x80000) {
+    rpl_set_error(rpl, CR_BINLOG_ERROR, 0, RPL_ERR_POS(rpl), "Sanity check failed: Invalid column count");
+    return NULL;
+  }
+
+  if (!tm_event->event.table_map.metadata.str || tm_event->event.table_map.metadata.length == 0)
+  {
+    rpl_set_error(rpl, CR_BINLOG_ERROR, 0, RPL_ERR_POS(rpl), "Sanity check failed: Missing table map metadata");
+    return NULL;
+  }
+
   start= pos = row_event->event.rows.row_data;
   end= start + row_event->event.rows.row_data_size;
+
+  if (!start || pos > end)
+  {
+    rpl_set_error(rpl, CR_BINLOG_ERROR, 0, RPL_ERR_POS(rpl), "Invalid pointer");
+    return NULL;
+  }
+
+  /* Create a strict ceiling boundary for metadata array parsing */
+  uchar *metadata_end = (uchar *)tm_event->event.table_map.metadata.str + tm_event->event.table_map.metadata.length;
 
   while (pos < end)
   {
@@ -388,17 +419,27 @@ mariadb_rpl_extract_rows(MARIADB_RPL *rpl,
 
     c_row->column_count= column_count;
     n_bitmap= pos;
-    pos+= (column_count + 7) / 8;
+
+    /* Ensure null-bitmap footprint doesn't overshoot the row payload buffer */
+    size_t bitmap_size = (column_count + 7) / 8;
+    if (pos + bitmap_size > end)
+      goto malformed_packet;
+    pos+= bitmap_size;
 
     for (i= 0; i < column_count; i++)
     {
+      /* Prevent table_map column_types string read overflows */
+      if (!tm_event->event.table_map.column_types.str || i >= tm_event->event.table_map.column_types.length)
+        goto malformed_packet;
+
       MARIADB_RPL_VALUE *column= &c_row->columns[i];
       column->field_type= (uchar)tm_event->event.table_map.column_types.str[i];
+
       /* enum, set and string types are stored as string - first metadata
          byte contains real_type, second byte contains the length */
       if (column->field_type == MYSQL_TYPE_STRING)
       {
-        if (metadata[0] == MYSQL_TYPE_ENUM || metadata[0] == MYSQL_TYPE_SET)
+        if (metadata < metadata_end && (metadata[0] == MYSQL_TYPE_ENUM || metadata[0] == MYSQL_TYPE_SET))
           column->field_type = metadata[0];
       }
 
@@ -408,8 +449,11 @@ mariadb_rpl_extract_rows(MARIADB_RPL *rpl,
         metadata+= rpl_metadata_size(column->field_type);
         continue;
       }
+
       if (column->field_type == MYSQL_TYPE_BLOB)
       {
+        if (metadata >= metadata_end)
+          goto malformed_packet;
         switch(metadata[0])
         {
           case 1:
@@ -425,104 +469,217 @@ mariadb_rpl_extract_rows(MARIADB_RPL *rpl,
             break;
         }
       }
+
       switch (column->field_type) {
+        case MYSQL_TYPE_NULL:
+          column->is_null = 1;
+          break;
+
         case MYSQL_TYPE_TINY:
+          if (pos + 1 > end)
+            goto malformed_packet;
           column->val.ll= sint1korr(pos);
           column->val.ull= uint1korr(pos);
           pos++;
           break;
+
         case MYSQL_TYPE_YEAR:
+          if (pos + 1 > end)
+            goto malformed_packet;
           column->val.ull= uint1korr(pos++) + 1900;
           break;
+
         case MYSQL_TYPE_SHORT:
+          if (pos + 2 > end)
+            goto malformed_packet;
           column->val.ll= sint2korr(pos);
           column->val.ull= uint2korr(pos);
           pos+= 2;
           break;
+
         case MYSQL_TYPE_INT24:
+          if (pos + 3 > end)
+            goto malformed_packet;
           column->val.ll= sint3korr(pos);
           column->val.ull= uint3korr(pos);
           pos+= 3;
           break;
+
         case MYSQL_TYPE_LONG:
+          if (pos + 4 > end)
+            goto malformed_packet;
           column->val.ll= sint4korr(pos);
           column->val.ull= uint4korr(pos);
           pos+= 4;
           break;
+
         case MYSQL_TYPE_LONGLONG:
+          if (pos + 8 > end)
+            goto malformed_packet;
           column->val.ll= sint8korr(pos);
           column->val.ull= uint8korr(pos);
           pos+= 8;
           break;
+
+        case MYSQL_TYPE_DECIMAL:
+        {
+          uint16_t s_len;
+          if (metadata + 2 > metadata_end)
+            goto malformed_packet;
+          s_len = uint2korr(metadata);
+          metadata += 2;
+          if (pos + s_len > end)
+            goto malformed_packet;
+          if (rpl_alloc_set_string_and_len(row_event, &column->val.str, pos, s_len))
+            goto mem_error;
+          pos += s_len;
+          break;
+        }
+
         case MYSQL_TYPE_NEWDECIMAL:
         {
-          uint8_t precision= *metadata++;
-          uint8_t scale= *metadata++;
+          if (metadata + 2 > metadata_end)
+            goto malformed_packet;
+          uint8_t precision;
+          uint8_t scale;
           uint32_t bin_size;
           decimal dec;
           char str[200];
           char buf[100];
           int s_len= sizeof(str) - 1;
 
+          if (metadata + 2 > metadata_end)
+            goto malformed_packet;
+
+          precision= *metadata++;
+          scale= *metadata++;
+
+          if (precision < 1 || precision > 65 || scale > 30 || scale > precision)
+            goto malformed_packet;
+
           dec.buf= (void *)buf;
           dec.len= sizeof(buf) / sizeof(decimal_digit);
 
           bin_size= decimal_bin_size(precision, scale);
+          if (pos + bin_size > end)
+            goto malformed_packet;
+
           bin2decimal((char *)pos, &dec, precision, scale);
           decimal2string(&dec, str, &s_len);
           pos+= bin_size;
 
           if (rpl_alloc_set_string_and_len(row_event, &column->val.str, str, s_len))
             goto mem_error;
-
           break;
         }
+
         case MYSQL_TYPE_FLOAT:
         case MYSQL_TYPE_DOUBLE:
         {
-          uint8_t flen= *metadata++;
+          uint8_t flen;
+
+          if (metadata + 1 > metadata_end)
+            goto malformed_packet;
+
+          flen= *metadata++;
+
+          if (pos + flen > end)
+            goto malformed_packet;
+
           if (flen == 4)
           {
             float4get(column->val.f, pos);
           }
-          if (flen == 8)
+          else if (flen == 8)
           {
             float8get(column->val.d, pos);
+          }
+          else
+          {
+            goto malformed_packet;
           }
           pos+= flen;
           break;
         }
+
         case MYSQL_TYPE_BIT:
         {
-          uint8_t num_bits= (metadata[0] & 0xFF) + metadata[1] * 8;
-          uint8_t b_len= (num_bits + 7) / 8;
+          uint8_t num_bits, b_len;
+
+          if (metadata + 2 > metadata_end)
+            goto malformed_packet;
+
+          num_bits= (metadata[0] & 0xFF) + metadata[1] * 8;
+          b_len= (num_bits + 7) / 8;
           metadata+= 2;
+
+          if (pos + b_len > end)
+            goto malformed_packet;
           if (rpl_alloc_set_string_and_len(row_event, &column->val.str, pos, b_len))
             goto mem_error;
           pos+= b_len;
           break;
         }
+
         case MYSQL_TYPE_TIMESTAMP:
         {
-          column->val.ts.second= myisam_uint4korr(pos);
+          if (pos + 4 > end)
+            goto malformed_packet;
+          column->val.ts.second= uint4korr(pos);
           column->val.ts.second_part= 0;
           pos+= 4;
           break;
         }
+
         case MYSQL_TYPE_TIMESTAMP2:
         {
           MYSQL_TIME tm;
+          size_t sp_len;
+
+          if (pos + 4 > end)
+            goto malformed_packet;
+
           column->val.ts.second= myisam_uint4korr(pos);
           pos+= 4;
-          pos+= ma_rpl_get_second_part(&tm, pos, metadata);
+
+          if (metadata >= metadata_end)
+            goto malformed_packet;
+
+          sp_len = ma_rpl_get_second_part(&tm, pos, metadata);
+          if (pos + sp_len > end)
+            goto malformed_packet;
+          pos+= sp_len;
           metadata++;
           column->val.ts.second_part= tm.second_part;
           break;
         }
+
+        case MYSQL_TYPE_NEWDATE:
+        {
+          MYSQL_TIME *tm = &column->val.tm;
+          uint32_t d_val;
+
+          if (pos + 3 > end)
+            goto malformed_packet;
+
+          d_val = uint3korr(pos);
+          pos += 3;
+          tm->day = d_val & 31;
+          tm->month = (d_val >> 5) & 15;
+          tm->year = d_val >> 9;
+          tm->time_type = MYSQL_TIMESTAMP_DATE;
+          break;
+        }
+
         case MYSQL_TYPE_DATE:
         {
           MYSQL_TIME *tm= &column->val.tm;
-          uint32_t d_val= uint3korr(pos);
+          uint32_t d_val;
+
+          if (pos + 3 > end)
+            goto malformed_packet;
+
+          d_val= uint3korr(pos);
           pos+= 3;
           tm->year= (int)(d_val / (16 * 32));
           tm->month= (int)(d_val / 32 % 16);
@@ -530,10 +687,34 @@ mariadb_rpl_extract_rows(MARIADB_RPL *rpl,
           tm->time_type= MYSQL_TIMESTAMP_DATE;
           break;
         }
+
+        case MYSQL_TYPE_TIME:
+        {
+          MYSQL_TIME *tm = &column->val.tm;
+          uint32_t t_val;
+
+          if (pos + 3 > end)
+            goto malformed_packet;
+
+          t_val = uint3korr(pos);
+          pos += 3;
+          tm->hour = t_val / 10000;
+          tm->minute = (t_val / 100) % 100;
+          tm->second = t_val % 100;
+          tm->time_type = MYSQL_TIMESTAMP_TIME;
+          break;
+        }
+
         case MYSQL_TYPE_TIME2:
         {
           MYSQL_TIME *tm= &column->val.tm;
-          int64_t t_val= myisam_uint3korr(pos) - 0x800000LL;
+          int64_t t_val;
+          size_t sp_len;
+
+          if (pos + 3 > end)
+            goto malformed_packet;
+
+          t_val= myisam_uint3korr(pos) - 0x800000LL;
 
           if ((tm->neg = t_val < 0))
             t_val= -t_val;
@@ -543,17 +724,49 @@ mariadb_rpl_extract_rows(MARIADB_RPL *rpl,
           tm->minute= (t_val >> 6) % (1 << 6);
           tm->second= t_val % (1 << 6);
 
-          pos+= ma_rpl_get_second_part(tm, pos, metadata);
+          if (metadata >= metadata_end)
+             goto malformed_packet;
+          sp_len = ma_rpl_get_second_part(tm, pos, metadata);
+          if (pos + sp_len > end)
+            goto malformed_packet;
+          pos+= sp_len;
           metadata++;
           tm->time_type= MYSQL_TIMESTAMP_TIME;
           column->field_type= MYSQL_TYPE_TIME;
           break;
         }
+
+        case MYSQL_TYPE_DATETIME:
+        {
+          MYSQL_TIME *tm = &column->val.tm;
+          uint64_t t;
+          uint32_t d_val, t_val;
+
+          if (pos + 8 > end)
+            goto malformed_packet;
+          t = uint8korr(pos);
+          pos += 8;
+          d_val = (uint32_t)(t / 1000000);
+          t_val = (uint32_t)(t % 1000000);
+          tm->year = d_val / 10000;
+          tm->month = (d_val / 100) % 100;
+          tm->day = d_val % 100;
+          tm->hour = t_val / 10000;
+          tm->minute = (t_val / 100) % 100;
+          tm->second = t_val % 100;
+          tm->time_type = MYSQL_TIMESTAMP_DATETIME;
+          break;
+        }
+
         case MYSQL_TYPE_DATETIME2:
         {
           MYSQL_TIME *tm= &column->val.tm;
-          uint64_t dt_val= mi_uint5korr(pos) - 0x8000000000LL,
-                   date_part, time_part;
+          uint64_t dt_val, date_part, time_part;
+          size_t sp_len;
+
+          if (pos + 5 > end)
+            goto malformed_packet;
+          dt_val= mi_uint5korr(pos) - 0x8000000000LL;
           pos+= 5;
 
           date_part= dt_val >> 17;
@@ -570,98 +783,117 @@ mariadb_rpl_extract_rows(MARIADB_RPL *rpl,
           tm->time_type= MYSQL_TIMESTAMP_DATETIME;
           column->field_type= MYSQL_TYPE_DATETIME;
 
-          pos+= ma_rpl_get_second_part(tm, pos, metadata);
+          if (metadata >= metadata_end)
+            goto malformed_packet;
+          sp_len = ma_rpl_get_second_part(tm, pos, metadata);
+          if (pos + sp_len > end)
+            goto malformed_packet;
+          pos+= sp_len;
           metadata++;
           break;
         }
+
         case MYSQL_TYPE_STRING:
         {
-          uint8_t s_len= metadata[2];
+          uint8_t s_len;
+
+          if (metadata + 3 > metadata_end)
+            goto malformed_packet;
+
+          s_len= metadata[2];
           metadata+= 2;
+
+          if (pos + s_len > end)
+            goto malformed_packet;
+
           if (rpl_alloc_set_string_and_len(row_event, &column->val.str, pos, s_len))
             goto mem_error;
           pos+= s_len;
           break;
         }
+
         case MYSQL_TYPE_ENUM:
-        {
-          uint8_t e_len= metadata[2];
-          metadata+= 2;
-          column->val.ull= uintNkorr(e_len, pos);
-          pos+= e_len;
-          break;
-        }
         case MYSQL_TYPE_SET:
         {
-          uint8_t e_len= metadata[2];
+          uint8_t e_len;
+
+          if (metadata + 3 > metadata_end)
+            goto malformed_packet;
+          e_len= metadata[2];
           metadata+= 2;
+
+          if (e_len > 8 || pos + e_len > end)
+            goto malformed_packet;
           column->val.ull= uintNkorr(e_len, pos);
           pos+= e_len;
           break;
         }
+
+        case MYSQL_TYPE_JSON:
+        case MYSQL_TYPE_GEOMETRY:
         case MYSQL_TYPE_TINY_BLOB:
         case MYSQL_TYPE_MEDIUM_BLOB:
         case MYSQL_TYPE_LONG_BLOB:
         case MYSQL_TYPE_BLOB:
-        case MYSQL_TYPE_GEOMETRY:
         {
-          uint8_t h_len= *metadata++;
-          uint64_t b_len= uintNkorr(h_len, pos);
+          uint8_t h_len;
+          uint64_t b_len;
+
+          if (metadata + 1 > metadata_end)
+            goto malformed_packet;
+
+          h_len= *metadata++;
+
+          if (pos + h_len > end)
+            goto malformed_packet;
+          b_len= uintNkorr(h_len, pos);
           pos+= h_len;
+
+          if (pos + b_len > end)
+            goto malformed_packet;
           if (rpl_alloc_set_string_and_len(row_event, &column->val.str, pos, (size_t)b_len))
             goto mem_error;
           pos+= b_len;
           break;
         }
+
         case MYSQL_TYPE_VARCHAR:
         case MYSQL_TYPE_VAR_STRING:
         {
-          uint32_t s_len= uint2korr(metadata);
-          uint8_t byte_len= rpl_byte_size(s_len);
+          uint32_t s_len;
+          uint8_t byte_len;
+
+          if (metadata + 2 > metadata_end)
+            goto malformed_packet;
+
+          s_len= uint2korr(metadata);
+          byte_len= rpl_byte_size(s_len);
           metadata+= 2;
+
+          if (pos + byte_len > end)
+            goto malformed_packet;
           s_len= (uint32_t)uintNkorr(byte_len, pos);
           pos+= byte_len;
+
+          if (pos + s_len > end)
+            goto malformed_packet;
           if (rpl_alloc_set_string_and_len(row_event, &column->val.str, pos, s_len))
             goto mem_error;
           pos+= s_len;
           break;
         }
-        case MYSQL_TYPE_TIME:
-        {
-          MYSQL_TIME *tm= &column->val.tm;
-          uint64_t t= uint8korr(pos);
-          pos+= 8;
-          tm->hour= (unsigned int)(t/100)/100;
-          tm->minute= (unsigned int)(t/100) % 100;
-          tm->second= (unsigned int)t % 100;
-          tm->time_type= MYSQL_TIMESTAMP_TIME;
-          break;
-        }
-        case MYSQL_TYPE_DATETIME:
-        {
-          MYSQL_TIME *tm= &column->val.tm;
-          uint64_t t= uint8korr(pos);
-          uint32_t d_val= (uint32_t)t / 1000000,
-                   t_val= (uint32_t)t % 1000000;
-          pos+= 8;
-          tm->year= (unsigned int)(d_val / 100) / 100;
-          tm->month= (unsigned int)(d_val / 100) % 100;
-          tm->day= (unsigned int)d_val % 100;
-          tm->hour= (t_val/100)/100;
-          tm->minute= (t_val/100) % 100;
-          tm->second= t_val % 100;
-          tm->time_type= MYSQL_TIMESTAMP_DATETIME;
-          break;
-        }
-
 
         default:
-          break;
+          goto malformed_packet;
       }
     }
     p_row= c_row;
   }
   return f_row;
+
+malformed_packet:
+  rpl_set_error(rpl, CR_BINLOG_ERROR, 0, RPL_ERR_POS(rpl), "Malformed row data packet stream.");
+  return NULL;
 
 mem_error:
   rpl_set_error(rpl, CR_OUT_OF_MEMORY, 0);
@@ -1062,17 +1294,26 @@ MARIADB_RPL_EVENT * STDCALL mariadb_rpl_fetch(MARIADB_RPL *rpl, MARIADB_RPL_EVEN
 
       if (ma_feof(rpl->fp))
       {
+        mariadb_free_rpl_event(rpl_event);
         return NULL;
       }
 
       memset(buf, 0, EVENT_HEADER_OFS);
-      if ((rc= ma_read(buf, 1, EVENT_HEADER_OFS - 1, rpl->fp)) != EVENT_HEADER_OFS - 1)
+      if ((rc= ma_read(buf, 1, EVENT_HEADER_OFS, rpl->fp)) != EVENT_HEADER_OFS)
       {
-         rpl_set_error(rpl, CR_BINLOG_ERROR, 0, "Can't read event header");
+         rpl_set_error(rpl, CR_BINLOG_ERROR, 0, RPL_ERR_POS(rpl), "Can't read event header");
          mariadb_free_rpl_event(rpl_event);
          return NULL;
       }
       len= uint4korr(p + 9);
+
+      if (len < EVENT_HEADER_OFS ||
+          len > MAX_PACKET_LENGTH)
+      {
+        rpl_set_error(rpl, CR_BINLOG_ERROR, 0, RPL_ERR_POS(rpl), "Sanity check failed: Malformed event length");
+        mariadb_free_rpl_event(rpl_event);
+        return NULL;
+      }
 
       if (!(rpl_event->raw_data= ma_alloc_root(&rpl_event->memroot, len)))
       {
@@ -1087,7 +1328,7 @@ MARIADB_RPL_EVENT * STDCALL mariadb_rpl_fetch(MARIADB_RPL *rpl, MARIADB_RPL_EVEN
       rc= ma_read(rpl_event->raw_data + EVENT_HEADER_OFS - 1, 1, len, rpl->fp);
       if (rc != len)
       {
-        rpl_set_error(rpl, CR_BINLOG_ERROR, 0, "Error while reading post header");
+        rpl_set_error(rpl, CR_BINLOG_ERROR, 0, RPL_ERR_POS(rpl), "Error while reading post header");
         mariadb_free_rpl_event(rpl_event);
         return NULL;
       }
@@ -1157,7 +1398,10 @@ MARIADB_RPL_EVENT * STDCALL mariadb_rpl_fetch(MARIADB_RPL *rpl, MARIADB_RPL_EVEN
     /* start of post_header */
     ev_start= ev;
 
-    DBUG_ASSERT(rpl_event->event_type < ENUM_END_EVENT);
+    if (rpl_event->event_type >= ENUM_END_EVENT) {
+      rpl_event->event_type= UNKNOWN_EVENT;
+      return rpl_event;
+    }
 
     switch(rpl_event->event_type) {
     case UNKNOWN_EVENT:
@@ -1286,6 +1530,8 @@ MARIADB_RPL_EVENT * STDCALL mariadb_rpl_fetch(MARIADB_RPL *rpl, MARIADB_RPL_EVEN
 
       ev+= 2;
       rpl_event->event.format_description.server_version = (char *)(ev);
+      /* for safety, we append a '\0' */
+      ev[49]= 0;
       ev+= 50;
       rpl_event->event.format_description.timestamp= uint4korr(ev);
       ev+= 4;
@@ -1293,6 +1539,8 @@ MARIADB_RPL_EVENT * STDCALL mariadb_rpl_fetch(MARIADB_RPL *rpl, MARIADB_RPL_EVEN
       ev+= 1;
       /*Post header lengths: 1 byte for each event, non-used events/gaps in enum should
                              have a zero value */
+
+      RPL_CHECK_POS(ev, ev_end, 5);
       len= ev_end - ev - 5;
       rpl_set_string_and_len(&rpl_event->event.format_description.post_header_lengths, ev, len);
       memset(rpl->post_header_len, 0, ENUM_END_EVENT);
@@ -1348,15 +1596,27 @@ MARIADB_RPL_EVENT * STDCALL mariadb_rpl_fetch(MARIADB_RPL *rpl, MARIADB_RPL_EVEN
       {
         uint8_t header_size= 0,
                 algorithm= 0;
+        uLongf source_len, dest_len;
 
         uint32_t uncompressed_len= get_compression_info(ev, &algorithm, &header_size);
+
+        if (header_size >= len ||
+            uncompressed_len == 0 ||
+            uncompressed_len > MAX_PACKET_LENGTH)
+        {
+          mariadb_free_rpl_event(rpl_event);
+          rpl_set_error(rpl, CR_ERR_BINLOG_UNCOMPRESS, SQLSTATE_UNKNOWN, RPL_ERR_POS(rpl));
+          return 0;
+        }
+        source_len= (uLongf)(len - header_size);
+        dest_len= (uLongf)uncompressed_len;
 
         len-= header_size;
         if (!(rpl_event->event.query.statement.str = ma_calloc_root(&rpl_event->memroot, uncompressed_len)))
           goto mem_error;
 
-        if ((uncompress((Bytef*)rpl_event->event.query.statement.str, (uLongf *)&uncompressed_len,
-           (Bytef*)ev + header_size, (uLongf)*&len) != Z_OK))
+        if ((uncompress((Bytef*)rpl_event->event.query.statement.str, &dest_len,
+           (Bytef*)ev + header_size, source_len) != Z_OK))
         {
           mariadb_free_rpl_event(rpl_event);
           rpl_set_error(rpl, CR_ERR_BINLOG_UNCOMPRESS, SQLSTATE_UNKNOWN, RPL_ERR_POS(rpl));
@@ -1435,8 +1695,8 @@ MARIADB_RPL_EVENT * STDCALL mariadb_rpl_fetch(MARIADB_RPL *rpl, MARIADB_RPL_EVEN
         rpl_parse_opt_metadata(rpl_event, ev, len);
         ev+= len;
       }
+      break;
     }
-    break;
 
     case RAND_EVENT:
       RPL_CHECK_POS(ev, ev_end, 16);
@@ -1479,12 +1739,34 @@ MARIADB_RPL_EVENT * STDCALL mariadb_rpl_fetch(MARIADB_RPL *rpl, MARIADB_RPL_EVEN
         {
           char str[200];
           int s_len= sizeof(str) - 1;
-          int precision= (int)ev[0],
-              scale= (int)ev[1];
+          int precision, scale;
           decimal d;
           decimal_digit buf[10];
+          size_t bin_size;
+
+
+          if (ev + 2 + bin_size > ev_end)
+          {
+            goto malformed_packet;
+          }
+
+          if (ev + 2 > ev_end)
+            goto malformed_packet;
+
+          precision= (int)ev[0];
+          scale= (int)ev[0];
+
+          if (precision < 1 || precision > 65 || scale < 0 || scale > 30 || scale > precision)
+            goto malformed_packet;
+
           d.len= 10;
           d.buf= buf;
+
+          bin_size = decimal_bin_size(precision, scale);
+
+          if (ev + 2 + bin_size > ev_end)
+            goto malformed_packet;
+
           bin2decimal((char *)(ev+2), &d, precision, scale);
           decimal2string(&d, str, &s_len);
           if (!(rpl_event->event.uservar.value.str =
@@ -1534,6 +1816,9 @@ MARIADB_RPL_EVENT * STDCALL mariadb_rpl_fetch(MARIADB_RPL *rpl, MARIADB_RPL_EVEN
 
       rpl_event->event.rotate.position= uint8korr(ev);
       ev+= 8;
+
+      if (ev + 4 > ev_end)
+        goto malformed_packet;
 
       /* Payload */
       len= ev_end - ev - 4;
@@ -1720,6 +2005,9 @@ MARIADB_RPL_EVENT * STDCALL mariadb_rpl_fetch(MARIADB_RPL *rpl, MARIADB_RPL_EVEN
       rpl_event->event.gtid_list.gtid_cnt= uint4korr(ev);
       ev+=4;
 
+      if (rpl_event->event.gtid_list.gtid_cnt > (MAX_PACKET_LENGTH / 16))
+        goto malformed_packet;
+
       RPL_CHECK_POS(ev, ev_end, rpl_event->event.gtid_list.gtid_cnt * 16);
       /* Payload */
       if (rpl_event->event.gtid_list.gtid_cnt)
@@ -1819,12 +2107,21 @@ MARIADB_RPL_EVENT * STDCALL mariadb_rpl_fetch(MARIADB_RPL *rpl, MARIADB_RPL_EVEN
       {
         RPL_CHECK_POS(ev, ev_end, 2);
         rpl_event->event.rows.extra_data_size= uint2korr(ev);
+        uint16_t payload_size= 0;
+
         ev+= 2;
-        RPL_CHECK_POS(ev, ev_end, rpl_event->event.rows.extra_data_size);
-        if (rpl_event->event.rows.extra_data_size - 2 > 0)
+
+        if (rpl_event->event.rows.extra_data_size < 2)
+          goto malformed_packet;
+
+        payload_size = rpl_event->event.rows.extra_data_size - 2;
+
+        RPL_CHECK_POS(ev, ev_end, payload_size);
+
+        if (payload_size > 0)
         {
-          rpl_alloc_set_string_and_len(rpl_event, rpl_event->event.rows.extra_data, ev, rpl_event->event.rows.extra_data_size - 2);
-          ev+= (rpl_event->event.rows.extra_data_size -2);
+          rpl_alloc_set_string_and_len(rpl_event, rpl_event->event.rows.extra_data, ev, payload_size);
+          ev+= payload_size;
         }
       }
       /* END_ROWS_EVENT_V2 */
@@ -1833,7 +2130,9 @@ MARIADB_RPL_EVENT * STDCALL mariadb_rpl_fetch(MARIADB_RPL *rpl, MARIADB_RPL_EVEN
       RPL_CHECK_FIELD_LENGTH(ev, ev_end);
       rpl_event->event.rows.column_count= mysql_net_field_length(&ev);
       bitmap_len= (rpl_event->event.rows.column_count + 7) / 8;
-      DBUG_ASSERT(rpl_event->event.rows.column_count > 0);
+
+      if (rpl_event->event.rows.column_count < 1)
+        goto malformed_packet;
 
       /* columns updated bitmap */
       RPL_CHECK_POS(ev, ev_end, bitmap_len);
@@ -1853,23 +2152,46 @@ MARIADB_RPL_EVENT * STDCALL mariadb_rpl_fetch(MARIADB_RPL *rpl, MARIADB_RPL_EVEN
       if (rpl_event->event.rows.compressed)
       {
         uint8_t algorithm= 0, header_size= 0;
+        uLongf source_len;
+        uLong dest_len;
         uint32_t uncompressed_len= get_compression_info(ev, &algorithm, &header_size);
+
+        if (header_size >= (ev_end - ev) ||
+            uncompressed_len == 0 ||
+            uncompressed_len > MAX_PACKET_LENGTH)
+        {
+          rpl_set_error(rpl, CR_ERR_BINLOG_UNCOMPRESS, SQLSTATE_UNKNOWN, RPL_ERR_POS(rpl));
+          mariadb_free_rpl_event(rpl_event);
+          return NULL;
+        }
+
+        if (ev + header_size > ev_end)
+          goto malformed_packet;
+
+        source_len= ev_end - (ev + header_size);
 
         if (!(rpl_event->event.rows.row_data = ma_calloc_root(&rpl_event->memroot, uncompressed_len)))
           goto mem_error;
 
-        if ((uncompress((Bytef*)rpl_event->event.rows.row_data, (uLong *)&uncompressed_len,
-           (Bytef*)ev + header_size, (uLongf )len) != Z_OK))
+        dest_len= (uLong)uncompressed_len;
+
+        if ((uncompress((Bytef*)rpl_event->event.rows.row_data, (uLong *)&dest_len,
+           (Bytef*)ev + header_size, source_len) != Z_OK))
         {
           rpl_set_error(rpl, CR_ERR_BINLOG_UNCOMPRESS, SQLSTATE_UNKNOWN, 0, RPL_ERR_POS(rpl));
           mariadb_free_rpl_event(rpl_event);
-          return 0;
+          return NULL;
         }
-        rpl_event->event.rows.row_data_size= uncompressed_len;
+        rpl_event->event.rows.row_data_size= dest_len;
         RPL_CHECK_POS(ev, ev_end, header_size + len);
-        ev+= header_size + len;
+        ev+= header_size + source_len;
       } else {
-        rpl_event->event.rows.row_data_size= ev_end - ev - (rpl->use_checksum ? 4 : 0);
+        size_t trailing_bytes= (rpl->use_checksum) ? 4 : 0;
+
+        if (ev + trailing_bytes > ev_end)
+          goto malformed_packet;
+
+        rpl_event->event.rows.row_data_size= ev_end - ev - trailing_bytes;
         if (!(rpl_event->event.rows.row_data =
             (char *)ma_calloc_root(&rpl_event->memroot, rpl_event->event.rows.row_data_size)))
           goto mem_error;
