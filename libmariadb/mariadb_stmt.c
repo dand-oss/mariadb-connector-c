@@ -160,12 +160,13 @@ my_bool mthd_supported_buffer_type(enum enum_field_types type)
 static my_bool madb_reset_stmt(MYSQL_STMT *stmt, unsigned int flags);
 static my_bool mysql_stmt_internal_reset(MYSQL_STMT *stmt, my_bool is_close);
 static int stmt_unbuffered_eof(MYSQL_STMT *stmt __attribute__((unused)),
-                               uchar **row __attribute__((unused)))
+                               uchar **row __attribute__((unused)),
+                               ulong *length __attribute__((unused)))
 {
   return MYSQL_NO_DATA;
 }
 
-static int stmt_unbuffered_fetch(MYSQL_STMT *stmt, uchar **row)
+static int stmt_unbuffered_fetch(MYSQL_STMT *stmt, uchar **row, ulong *length)
 {
   ulong pkt_len;
 
@@ -180,25 +181,29 @@ static int stmt_unbuffered_fetch(MYSQL_STMT *stmt, uchar **row)
   if (stmt->mysql->net.read_pos[0] == 254)
   {
     *row = NULL;
+    *length= 0;
     stmt->fetch_row_func= stmt_unbuffered_eof;
     return(MYSQL_NO_DATA);
-  }
-  else
+  } else {
     *row = stmt->mysql->net.read_pos;
+    *length = pkt_len;
+  }
   stmt->result.rows++;
   return(0);
 }
 
-static int stmt_buffered_fetch(MYSQL_STMT *stmt, uchar **row)
+static int stmt_buffered_fetch(MYSQL_STMT *stmt, uchar **row, ulong *length)
 {
   if (!stmt->result_cursor)
   {
     *row= NULL;
+    *length= 0;
     stmt->state= MYSQL_STMT_FETCH_DONE;
     return MYSQL_NO_DATA;
   }
   stmt->state= MYSQL_STMT_USER_FETCHING;
   *row= (uchar *)stmt->result_cursor->data;
+  *length= stmt->result_cursor->length;
 
   stmt->result_cursor= stmt->result_cursor->next;
   return 0;
@@ -318,7 +323,7 @@ int mthd_stmt_read_all_rows(MYSQL_STMT *stmt)
   return(1);
 }
 
-static int stmt_cursor_fetch(MYSQL_STMT *stmt, uchar **row)
+static int stmt_cursor_fetch(MYSQL_STMT *stmt, uchar **row, ulong *length)
 {
   uchar buf[STMT_ID_LENGTH + 4];
   MYSQL_DATA *result= &stmt->result;
@@ -331,7 +336,7 @@ static int stmt_cursor_fetch(MYSQL_STMT *stmt, uchar **row)
 
   /* do we have some prefetched rows available ? */
   if (stmt->result_cursor)
-    return(stmt_buffered_fetch(stmt, row));
+    return(stmt_buffered_fetch(stmt, row, length));
   if (stmt->upsert_status.server_status & SERVER_STATUS_LAST_ROW_SENT)
     stmt->upsert_status.server_status&=  ~SERVER_STATUS_LAST_ROW_SENT;
   else
@@ -355,7 +360,7 @@ static int stmt_cursor_fetch(MYSQL_STMT *stmt, uchar **row)
       if (stmt->mysql->methods->db_stmt_read_all_rows(stmt))
         return(1);
 
-      return(stmt_buffered_fetch(stmt, row));
+      return(stmt_buffered_fetch(stmt, row, length));
     }
   }
   /* no more cursor data available */
@@ -401,17 +406,32 @@ end:
   stmt->state= MYSQL_STMT_FETCH_DONE;
 }
 
-int mthd_stmt_fetch_to_bind(MYSQL_STMT *stmt, unsigned char *row)
+int mthd_stmt_fetch_to_bind(MYSQL_STMT *stmt, unsigned char *row, ulong length)
 {
   uint i;
   size_t truncations= 0;
-  unsigned char *null_ptr, bit_offset= 4;
+  unsigned char *null_ptr,
+                bit_offset= 4,
+                *end= row + length;
+
+
+  if (row + 1 + (stmt->field_count + 9) / 8 > end) {
+    stmt_set_error(stmt, CR_MALFORMED_PACKET, SQLSTATE_UNKNOWN, 0);
+    return MYSQL_DATA_MALFORMED;
+  }
+
   row++; /* skip status byte */
   null_ptr= row;
   row+= (stmt->field_count + 9) / 8;
 
   for (i=0; i < stmt->field_count; i++)
   {
+    MYSQL_FIELD *field= &stmt->fields[i];
+    MYSQL_BIND *bind= &stmt->bind[i];
+    MYSQL_PS_CONVERSION *ps_fetch_func= &mysql_ps_fetch_functions[field->type];
+    int pack_len= ps_fetch_func->pack_len;
+
+
     /* save row position for fetching values in pieces */
     if (*null_ptr & bit_offset)
     {
@@ -419,8 +439,8 @@ int mthd_stmt_fetch_to_bind(MYSQL_STMT *stmt, unsigned char *row)
         stmt->result_callback(stmt->user_data, i, NULL);
       else
       {
-        if (!stmt->bind[i].is_null)
-          stmt->bind[i].is_null= &stmt->bind[i].is_null_value;
+        if (!bind->is_null)
+          bind->is_null= &bind->is_null_value;
         *stmt->bind[i].is_null= 1;
         stmt->bind[i].u.row_ptr= NULL;
         if (!stmt->bind[i].length)
@@ -430,38 +450,84 @@ int mthd_stmt_fetch_to_bind(MYSQL_STMT *stmt, unsigned char *row)
       }
     } else
     {
-      stmt->bind[i].u.row_ptr= row;
+      ulong data_len;
+      size_t packet_left;
+      uchar *tmp_row= row;
+      char errmsg[MYSQL_ERRMSG_SIZE];
+
+      bind->u.row_ptr= row;
+
+      if (pack_len >= 0)
+        data_len= pack_len;
+      else
+        data_len= net_field_length(&tmp_row);
+
+      packet_left= end - tmp_row;
+
+      /* CONC-820: 1. Check sentinel */
+      if (data_len > packet_left) {
+        snprintf(errmsg, sizeof(errmsg)-1, "Malformed packet: Column %d has length %lu, while remaining space is %zu bytes", i, data_len, packet_left);
+        stmt_set_error(stmt, CR_MALFORMED_PACKET, SQLSTATE_UNKNOWN, errmsg);
+        return MYSQL_DATA_MALFORMED;
+      }
+
+      /* CONC-820: 2. Check if length exceeds max. lengths */
+      switch (stmt->fields[i].type) {
+        case MYSQL_TYPE_TINY:
+        case MYSQL_TYPE_SHORT:
+        case MYSQL_TYPE_INT24:
+        case MYSQL_TYPE_LONG:
+        case MYSQL_TYPE_LONGLONG:
+          if (field->length > MAX_ZEROFILL_LEN) {
+            snprintf(errmsg, sizeof(errmsg) - 1, "Malformed packet: length is %lu, while maximum display length for column %d is %u bytes",
+                   field->length, i, MAX_ZEROFILL_LEN);
+            stmt_set_error(stmt, CR_MALFORMED_PACKET, SQLSTATE_UNKNOWN, errmsg);
+            return MYSQL_DATA_MALFORMED;
+          }
+          break;
+        case MYSQL_TYPE_NEWDECIMAL:
+          if (data_len > MAX_DECIMAL_LEN || field->length > MAX_DECIMAL_LEN) {
+            snprintf(errmsg, sizeof(errmsg) - 1, "Malformed packet: length is %lu, while maximum length for decimal in column %d is %u bytes",
+                   field->length, i, MAX_DECIMAL_LEN);
+            stmt_set_error(stmt, CR_MALFORMED_PACKET, SQLSTATE_UNKNOWN, errmsg);
+            return MYSQL_DATA_MALFORMED;
+          }
+          break;
+        default:
+          break;
+      }
+
       if (!stmt->bind_result_done ||
-          stmt->bind[i].flags & MADB_BIND_DUMMY)
+          bind->flags & MADB_BIND_DUMMY)
       {
         unsigned long length;
 
         if (stmt->result_callback)
           stmt->result_callback(stmt->user_data, i, &row);
         else {
-          if (!stmt->bind[i].is_null)
-            stmt->bind[i].is_null= &stmt->bind[i].is_null_value;
-          *stmt->bind[i].is_null= 0;
+          if (!bind->is_null)
+            bind->is_null= &bind->is_null_value;
+          *bind->is_null= 0;
           if (mysql_ps_fetch_functions[stmt->fields[i].type].pack_len >= 0)
             length= mysql_ps_fetch_functions[stmt->fields[i].type].pack_len;
           else
             length= net_field_length(&row);
           row+= length;
-          if (!stmt->bind[i].length)
-            stmt->bind[i].length= &stmt->bind[i].length_value;
-          *stmt->bind[i].length= stmt->bind[i].length_value= length;
+          if (!bind->length)
+            bind->length= &bind->length_value;
+          *bind->length= bind->length_value= length;
         }
       }
       else
       {
-        if (!stmt->bind[i].length)
-          stmt->bind[i].length= &stmt->bind[i].length_value;
-        if (!stmt->bind[i].is_null)
-          stmt->bind[i].is_null= &stmt->bind[i].is_null_value;
-        *stmt->bind[i].is_null= 0;
-        mysql_ps_fetch_functions[stmt->fields[i].type].func(&stmt->bind[i], &stmt->fields[i], &row);
+        if (!bind->length)
+          bind->length= &bind->length_value;
+        if (!bind->is_null)
+          bind->is_null= &bind->is_null_value;
+        *bind->is_null= 0;
+        ps_fetch_func->func(bind, field, &row);
         if (stmt->mysql->options.report_data_truncation)
-          truncations+= *stmt->bind[i].error;
+          truncations+= *bind->error;
       }
     }
 
@@ -1536,14 +1602,15 @@ const char * STDCALL mysql_stmt_error(MYSQL_STMT *stmt)
   return (const char *)stmt->last_error;
 }
 
-int mthd_stmt_fetch_row(MYSQL_STMT *stmt, unsigned char **row)
+int mthd_stmt_fetch_row(MYSQL_STMT *stmt, unsigned char **row, ulong *length)
 {
-  return stmt->fetch_row_func(stmt, row);
+  return stmt->fetch_row_func(stmt, row, length);
 }
 
 int STDCALL mysql_stmt_fetch(MYSQL_STMT *stmt)
 {
   unsigned char *row;
+  ulong length;
   int rc;
 
   if (stmt->state <= MYSQL_STMT_EXECUTED)
@@ -1564,7 +1631,7 @@ int STDCALL mysql_stmt_fetch(MYSQL_STMT *stmt)
   if (stmt->state == MYSQL_STMT_FETCH_DONE)
     return(MYSQL_NO_DATA);
 
-  if ((rc= stmt->mysql->methods->db_stmt_fetch(stmt, &row)))
+  if ((rc= stmt->mysql->methods->db_stmt_fetch(stmt, &row, &length)))
   {
     stmt->state= MYSQL_STMT_FETCH_DONE;
     stmt->mysql->status= MYSQL_STATUS_READY;
@@ -1572,11 +1639,13 @@ int STDCALL mysql_stmt_fetch(MYSQL_STMT *stmt)
     return(rc);
   }
 
-  rc= stmt->mysql->methods->db_stmt_fetch_to_bind(stmt, row);
+  rc= stmt->mysql->methods->db_stmt_fetch_to_bind(stmt, row, length);
 
   stmt->state= MYSQL_STMT_USER_FETCHING;
-  CLEAR_CLIENT_ERROR(stmt->mysql);
-  CLEAR_CLIENT_STMT_ERROR(stmt);
+  if (rc != MYSQL_DATA_MALFORMED) {
+    CLEAR_CLIENT_ERROR(stmt->mysql);
+    CLEAR_CLIENT_STMT_ERROR(stmt);
+  }
   return(rc);
 }
 
