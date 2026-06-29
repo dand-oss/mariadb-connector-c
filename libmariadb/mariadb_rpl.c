@@ -1502,6 +1502,7 @@ MARIADB_RPL_EVENT * STDCALL mariadb_rpl_fetch(MARIADB_RPL *rpl, MARIADB_RPL_EVEN
       break;
 
     case FORMAT_DESCRIPTION_EVENT:
+    {
       /*
          FORMAT_DESCRIPTION_EVENT:
 
@@ -1520,12 +1521,15 @@ MARIADB_RPL_EVENT * STDCALL mariadb_rpl_fetch(MARIADB_RPL *rpl, MARIADB_RPL_EVEN
 
       /* We don't speak bing log protocol version < 4, in case it's an older
          protocol version an error will be returned. */
+      ushort binlog_format;
+
       RPL_CHECK_POS(ev, ev_end, 57);
-      if ((rpl_event->event.format_description.format = uint2korr(ev)) < 4)
+      binlog_format= uint2korr(ev);
+      if ((rpl_event->event.format_description.format = binlog_format) < 4)
       {
         mariadb_free_rpl_event(rpl_event);
         rpl_set_error(rpl, CR_ERR_UNSUPPORTED_BINLOG_FORMAT, SQLSTATE_UNKNOWN, 0,
-                     RPL_ERR_POS(rpl), uint2korr(ev));
+                     RPL_ERR_POS(rpl), binlog_format);
         return 0;
       }
 
@@ -1556,6 +1560,7 @@ MARIADB_RPL_EVENT * STDCALL mariadb_rpl_fetch(MARIADB_RPL *rpl, MARIADB_RPL_EVEN
         ev+= 4;
       }
       break;
+    }
 
     case QUERY_COMPRESSED_EVENT:
     case QUERY_EVENT:

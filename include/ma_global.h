@@ -554,7 +554,14 @@ typedef long my_ptrdiff_t;
 /* Size to make addressable obj. */
 #define ALIGN_PTR(A, t) ((t*) MY_ALIGN((A),sizeof(t)))
 			 /* Offset of filed f in structure t */
-#define OFFSET(t, f)	((size_t)(char *)&((t *)0)->f)
+#if defined(__builtin_offsetof)
+#define OFFSET(t, f) __builtin_offsetof(t, f)
+#elif defined(offsetof)
+#define OFFSET(t, f) offsetof(t, f)
+#else
+#define OFFSET(t, f) ((size_t)&(((t *)0)->f))
+#endif
+
 #define ADD_TO_PTR(ptr,size,type) (type) ((unsigned char*) (ptr)+size)
 #define PTR_BYTE_DIFF(A,B) (my_ptrdiff_t) ((unsigned char*) (A) - (unsigned char*) (B))
 

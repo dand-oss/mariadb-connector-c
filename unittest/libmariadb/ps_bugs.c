@@ -834,6 +834,8 @@ static int test_bug16144(MYSQL *mysql)
 
   /* Check that attr_get returns correct data on little and big endian CPUs */
   stmt= mysql_stmt_init(mysql);
+  check(stmt);
+
   mysql_stmt_attr_set(stmt, STMT_ATTR_UPDATE_MAX_LENGTH, (const void*) &flag);
   mysql_stmt_attr_get(stmt, STMT_ATTR_UPDATE_MAX_LENGTH, (void*) &flag);
   FAIL_UNLESS(flag == flag_orig, "flag != flag_orig");
@@ -5231,6 +5233,8 @@ static int test_mdev_21920(MYSQL *mysql)
   MYSQL_BIND bind[1];
   int rc;
   char buffer[128];
+
+  check(mysql);
 
   rc= mysql_stmt_prepare(stmt, SL("SELECT ''"));
   check_stmt_rc(rc, stmt);
