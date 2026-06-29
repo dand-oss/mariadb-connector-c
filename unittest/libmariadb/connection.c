@@ -2263,6 +2263,8 @@ static int test_status_callback(MYSQL *my __attribute__((unused)))
   int rc;
   struct st_callback data= {0,"", ""};
 
+  check(mysql);
+
   rc= mysql_optionsv(mysql, MARIADB_OPT_STATUS_CALLBACK, my_status_callback, &data);
 
   if (!my_test_connect(mysql, hostname, username,
