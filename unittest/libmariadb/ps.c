@@ -5240,6 +5240,8 @@ static int test_conc691(MYSQL *mysql)
   const char *sql_stmt[]= {"SELECT 'test' FROM DUAL", "This will return an error", "SELECT 1 FROM DUAL"};
   int rc, i;
 
+  check(stmt);
+
   rc= mysql_stmt_attr_get(stmt, STMT_ATTR_SQL_STATEMENT, &sql);
   check_stmt_rc(rc, stmt);
 
