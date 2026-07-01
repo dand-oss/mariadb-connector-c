@@ -108,6 +108,25 @@ jobs:
           path: |
             ${{ github.workspace }}/workdir-server/bld/mysql-test/var/**/log/*.err
 
+  ci-clang:
+    name: clang build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: install clang
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y clang
+
+      - name: build with clang
+        run: |
+          clang --version
+          cmake . -DCMAKE_BUILD_TYPE=RelWithDebInfo -DWITH_EXTERNAL_ZLIB=On \
+            -DCMAKE_C_COMPILER=clang -DCMAKE_CXX_COMPILER=clang++ \
+            -DCMAKE_C_FLAGS="-Werror" -DCMAKE_CXX_FLAGS="-Werror"
+          make -j$(nproc)
+
   ci:
     name: ${{ matrix.name }}
     needs: setup
