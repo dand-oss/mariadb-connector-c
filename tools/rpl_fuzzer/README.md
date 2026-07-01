@@ -68,7 +68,7 @@ run the unittest suite. Afterwards copy the first binlog file to the data folder
 #### Compressed Row/Query Seeds
 
 For both SBR and RBR set the global variable binlog_compression to ON, run the unittest suite and copy
-the first binlog file to the server and rename it.
+the first binlog file to the data folder and rename it.
 
 ---
 

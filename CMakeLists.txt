@@ -33,6 +33,10 @@ ADD_OPTION(WITH_BOOST_CONTEXT
   "Use Boost::Context for the non-blocking API on platforms without native implementation"
   OFF)
 
+ADD_OPTION(WITH_TOOLS
+           "Build tools"
+           OFF)
+
 IF(WITH_BOOST_CONTEXT)
   PROJECT(mariadb-connector-c LANGUAGES C CXX)
 ELSE()
@@ -514,7 +518,9 @@ IF((NOT WIN32) OR CYGWIN)
   ADD_SUBDIRECTORY(mariadb_config)
 ENDIF()
 
-ADD_SUBDIRECTORY(tools)
+IF(WITH_TOOLS)
+  ADD_SUBDIRECTORY(tools)
+ENDIF()
 
 IF(IS_DIRECTORY ${CC_SOURCE_DIR}/unittest)
   IF(WITH_UNIT_TESTS)
