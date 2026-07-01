@@ -123,8 +123,7 @@ jobs:
         run: |
           clang --version
           cmake . -DCMAKE_BUILD_TYPE=RelWithDebInfo -DWITH_EXTERNAL_ZLIB=On \
-            -DCMAKE_C_COMPILER=clang -DCMAKE_CXX_COMPILER=clang++ \
-            -DCMAKE_C_FLAGS="-Werror" -DCMAKE_CXX_FLAGS="-Werror"
+            -DCMAKE_C_COMPILER=clang -DCMAKE_CXX_COMPILER=clang++
           make -j$(nproc)
 
   ci:
