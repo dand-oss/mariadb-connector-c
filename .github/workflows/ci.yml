@@ -34,7 +34,7 @@ jobs:
           additional-matrix: '[{"name": "MariaDB 11.4 (local) - windows 2025", "os": "windows-2025", "db-type": "community", "db-tag": "11.4"},{"name": "MariaDB 11.4 32bits (local) - windows 2025", "os": "windows-2025", "db-type": "community", "db-tag": "11.4", "arch": "32"}]'
 
   ci-server:
-    name: server ${{ matrix.server.version }} test suite ${{ matrix.server.env && format(' {0}', matrix.server.env) || '' }}
+    name: server ${{ matrix.server.version }} test suite${{ matrix.server.ps && format(' {0}', matrix.server.ps) || '' }}
     runs-on: ubuntu-latest
     continue-on-error: true
     strategy:
@@ -42,8 +42,8 @@ jobs:
       matrix:
         server:
           - version: '11.4'
-          - version: '11.8'
-            env: TEST_OPTION=--ps-protocol
+          - version: '11.8'  
+            ps: '--ps-protocol'
     steps:
       - name: Retrieve server ${{ matrix.server.version }}
         shell: bash
@@ -96,7 +96,7 @@ jobs:
           ls -lrt
           ./mysql-test-run.pl --suite=main,unit ${TEST_OPTION} --parallel=auto --skip-test=session_tracker_last_gtid
         env:
-          TEST_OPTION: ${{ matrix.server.env.TEST_OPTION }}
+          TEST_OPTION: ${{ matrix.server.ps }}
           MYSQL_TEST_HOST: 127.0.0.1
 
       - name: Archive error logs
