@@ -96,7 +96,11 @@ jobs:
           ls -lrt
           ./mysql-test-run.pl --suite=main,unit ${TEST_OPTION} --parallel=auto --skip-test=session_tracker_last_gtid
         env:
+<<<<<<< HEAD
           TEST_OPTION: ${{ matrix.server.ps }}
+=======
+          TEST_OPTION: ${{ matrix.server.ps}}
+>>>>>>> 3.3
           MYSQL_TEST_HOST: 127.0.0.1
 
       - name: Archive error logs
