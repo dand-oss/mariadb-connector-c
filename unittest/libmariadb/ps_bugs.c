@@ -6157,8 +6157,10 @@ static int test_conc821(MYSQL *mysql)
       FAIL_IF(lengths[j] == 0, "invalid length");
     /* 2nd row contains NULL values */
     if (i == 1) {
-      for (uint j=0; j < 4; j++)
-        FAIL_IF(is_null[j] == 0, "invalid null indicator");
+      for (uint j=0; j < 4; j++) {
+        if (j != 2) /* ignore 3rd column, depends on explicit_defaults_for_timestamp setting */
+          FAIL_IF(is_null[j] == 0, "invalid null indicator");
+     }
     } else
       for (uint j=0; j < 4; j++)
         FAIL_IF(is_null[j] == 1, "invalid null indicator");
