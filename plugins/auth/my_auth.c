@@ -639,9 +639,8 @@ int run_plugin_auth(MYSQL *mysql, char *data, uint data_len,
   const char    *auth_plugin_name= NULL;
   auth_plugin_t *auth_plugin;
   MCPVIO_EXT    mpvio;
-  ulong		pkt_length;
+  ulong		      pkt_length;
   int           res;
-
 
   /* determine the default/initial plugin to use */
   if (mysql->server_capabilities & CLIENT_PLUGIN_AUTH)
