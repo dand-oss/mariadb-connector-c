@@ -6045,13 +6045,13 @@ static int test_conc762(MYSQL *mysql)
   mysql_stmt_fetch(stmt);
   FAIL_IF(is_null[1]==0, "Expected NULL value");
   FAIL_IF(is_null[0]==1, "Expected non-NULL value");
-  FAIL_IF(length[1]!=0, "Expected length=0");
+  FAIL_IF(length[1]!=3, "Expected length=3");
   FAIL_IF(length[0]!=3, "Expected length=3");
 
   mysql_stmt_fetch(stmt);
   FAIL_IF(is_null[0]==0, "Expected NULL value");
   FAIL_IF(is_null[1]==1, "Expected non-NULL value");
-  FAIL_IF(length[0]!=0, "Expected length=0");
+  FAIL_IF(length[0]!=3, "Expected length=3");
   FAIL_IF(length[1]!=6, "Expected length=3");
 
   /* Also check with MYSQL_TYPE_NULL */
@@ -6165,11 +6165,83 @@ static int test_overflow(MYSQL *mysql)
   return OK;
 }
 
+static int test_conc821(MYSQL *mysql)
+{
+  MYSQL_STMT *stmt;
+  int rc;
+  MYSQL_BIND bind[4];
+  ulong lengths[4];
+  my_bool is_null[4];
+  uint8_t tiny;
+  uchar buffer[1000];
+  MYSQL_TIME dt, ts;
 
+  rc= mysql_query(mysql, "DROP TABLE IF EXISTS t1");
+  check_mysql_rc(rc, mysql);
+
+  rc= mysql_query(mysql, "CREATE TABLE t1 (a DATETIME, b varchar(100), c timestamp, d tinyint)");
+  check_mysql_rc(rc, mysql);
+
+  rc= mysql_query(mysql, "INSERT INTO t1 VALUES (NOW(), 'test', NOW(), 1), "
+                         "(NULL, NULL, NULL, NULL), (NOW(), '6chars', NOW(), 2)");
+  check_mysql_rc(rc, mysql);
+
+  stmt= mysql_stmt_init(mysql);
+  check(stmt);
+
+  rc= mysql_stmt_prepare(stmt, SL("SELECT a, b, c, d FROM t1"));
+  check_stmt_rc(rc, stmt);
+
+  rc= mysql_stmt_execute(stmt);
+  check_stmt_rc(rc, stmt);
+
+  memset(bind, 0, sizeof(MYSQL_BIND) * 4);
+  bind[0].buffer_type = MYSQL_TYPE_DATETIME;
+  bind[1].buffer_type = MYSQL_TYPE_VAR_STRING;
+  bind[2].buffer_type = MYSQL_TYPE_TIMESTAMP;
+  bind[3].buffer_type = MYSQL_TYPE_TINY;
+  bind[0].buffer= &dt;
+  bind[1].buffer= buffer;
+  bind[2].buffer= &ts;
+  bind[3].buffer= &tiny;
+  bind[0].buffer_length= bind[2].buffer_length= sizeof(MYSQL_TIME);
+  bind[1].buffer_length= sizeof(buffer);
+  bind[3].buffer_length= 1;
+
+  for (uint i= 0; i < 4; i++) {
+    bind[i].is_null= &is_null[i];
+    bind[i].length= &lengths[i];
+  }
+
+  rc= mysql_stmt_bind_result(stmt, bind);
+  check_stmt_rc(rc, stmt);
+
+  for (uint i=0; i < 3; i++) {
+    rc= mysql_stmt_fetch(stmt);
+    check_stmt_rc(rc, stmt);
+
+    /* Since 1st row contained values, length values can't be 0 */
+    for (uint j=0; j < 4; j++)
+      FAIL_IF(lengths[j] == 0, "invalid length");
+    /* 2nd row contains NULL values */
+    if (i == 1) {
+      for (uint j=0; j < 4; j++) {
+        if (j != 2) /* ignore 3rd column, depends on explicit_defaults_for_timestamp setting */
+          FAIL_IF(is_null[j] == 0, "invalid null indicator");
+     }
+    } else
+      for (uint j=0; j < 4; j++)
+        FAIL_IF(is_null[j] == 1, "invalid null indicator");
+  }
+
+  mysql_stmt_close(stmt);
+  return OK;
+}
 
 struct my_tests_st my_tests[] = {
   {"test_conc683", test_conc683, TEST_CONNECTION_DEFAULT, 0, NULL, NULL},
   {"test_conc667", test_conc667, TEST_CONNECTION_DEFAULT, 0, NULL, NULL},
+  {"test_conc821", test_conc821, TEST_CONNECTION_NEW, 0, NULL, NULL},
   {"test_overflow", test_overflow, TEST_CONNECTION_NEW, 0, NULL, NULL},
   {"test_conc702", test_conc702, TEST_CONNECTION_DEFAULT, 0, NULL, NULL},
   {"test_conc762", test_conc762, TEST_CONNECTION_DEFAULT, 0, NULL, NULL},

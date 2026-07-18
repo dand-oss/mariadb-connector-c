@@ -1657,6 +1657,7 @@ MYSQL *mthd_my_real_connect(MYSQL *mysql, const char *host, const char *user,
   char *host_copy= NULL;
   struct st_host *host_list= NULL;
   int connect_attempts= 0;
+  ulong save_max_allowed_packet= max_allowed_packet;
 
   if (!mysql->methods)
     mysql->methods= &MARIADB_DEFAULT_METHODS;
@@ -1715,6 +1716,14 @@ MYSQL *mthd_my_real_connect(MYSQL *mysql, const char *host, const char *user,
 
     ma_get_host_list(host_copy, host_list, port);
   }
+
+ 
+
+  /* CONC-835: Restrict packet length to 1MB */
+  if (mysql->options.max_allowed_packet)
+    save_max_allowed_packet= mysql->options.max_allowed_packet;
+  else
+    save_max_allowed_packet= max_allowed_packet;
 
 restart:
   /* check if we reached end of list */
@@ -1847,6 +1856,7 @@ restart:
     ma_pvio_close(pvio);
     goto error;
   }
+  net->max_packet_size= max_allowed_auth_packet;
 
   if (mysql->options.extension && mysql->options.extension->async_context && mysql->options.extension->async_context->pvio)
   {
@@ -1854,10 +1864,6 @@ restart:
      * invalidate the pvio pointer in the async context */
     mysql->options.extension->async_context->pvio = NULL;
   }
-
-
-  if (mysql->options.max_allowed_packet)
-    net->max_packet_size= mysql->options.max_allowed_packet;
 
   ma_pvio_keepalive(net->pvio);
   strcpy(mysql->net.sqlstate, "00000");
@@ -2031,6 +2037,9 @@ restart:
                              scramble_plugin, db))
     goto error;
 
+  /* restore max_packet_size */
+  mysql->net.max_packet_size= save_max_allowed_packet;
+
   if (mysql->client_flag & CLIENT_COMPRESS ||
       mysql->client_flag & CLIENT_ZSTD_COMPRESSION)
   {
@@ -2101,6 +2110,7 @@ error:
   free(host_list);
   free(host_copy);
   end_server(mysql);
+  mysql->net.max_packet_size= save_max_allowed_packet;
   /* only free the allocated memory, user needs to call mysql_close */
   mysql_close_memory(mysql);
   if (!(client_flag & CLIENT_REMEMBER_OPTIONS) &&

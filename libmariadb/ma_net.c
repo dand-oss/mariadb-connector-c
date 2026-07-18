@@ -52,6 +52,7 @@
 
 #undef max_allowed_packet
 ulong max_allowed_packet=1024L * 1024L * 1024L;
+ulong max_allowed_auth_packet = 1024L * 1024L;
 ulong net_read_timeout=  NET_READ_TIMEOUT;
 ulong net_write_timeout= NET_WRITE_TIMEOUT;
 ulong net_buffer_length= 8192;	/* Default length. Enlarged if necessary */
@@ -447,17 +448,30 @@ ulong ma_net_read(NET *net)
 
       do
       {
+        if (length + len > net->max_packet_size) {
+          net->error= 1;
+          net->pvio->set_error(net->pvio->mysql, CR_NET_PACKET_TOO_LARGE, SQLSTATE_UNKNOWN, 0);
+          return packet_error;
+        }
         length+= len;
         net->where_b+= (unsigned long)len;
         len= ma_real_read(net, &complen);
       } while (len == MAX_PACKET_LENGTH);
       net->where_b= last_pos;
-      if (len != packet_error)
+      if (len != packet_error) {
         len+= length;
+      }
     }
-    net->read_pos = net->buff + net->where_b;
-    if (len != packet_error)
+    if (len != packet_error) {
+      if (len > net->max_packet_size)
+      {
+        net->error = 1;
+        net->pvio->set_error(net->pvio->mysql, CR_NET_PACKET_TOO_LARGE, SQLSTATE_UNKNOWN, 0);
+        return packet_error;
+      }
+      net->read_pos = net->buff + net->where_b;
       net->read_pos[len]=0;		/* Safeguard for mysql_use_result */
+    }
     return (ulong)len;
 #ifdef HAVE_COMPRESS
   }
