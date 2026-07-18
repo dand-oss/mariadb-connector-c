@@ -1118,7 +1118,6 @@ static my_bool ma_get_rset_field_lengths(MYSQL_ROW row, unsigned int field_count
 
   while (row != end)
   {
-    last_length= lengths;
     if (*row)
     {
       if (pos)
@@ -1127,9 +1126,10 @@ static my_bool ma_get_rset_field_lengths(MYSQL_ROW row, unsigned int field_count
     } else {
       /* NULL_LENGTH (see also CONC-709) */
       rc= 1;
-      *last_length= 0;
+      if (last_length)
+        *last_length= 0;
     }
-    lengths++;
+    last_length= lengths++;
     row++;
   }
   return rc;
@@ -2119,12 +2119,15 @@ error:
   if (!(client_flag & CLIENT_REMEMBER_OPTIONS) &&
       !(IS_MYSQL_ASYNC(mysql)))
   {
-    struct st_mysql_options_extension *tmp= mysql->options.extension;
-    /* don't free options->extension */
-    mysql->options.extension= NULL;
     mysql_close_options(mysql);
-    /* restore options->extension */
-    mysql->options.extension= tmp;
+    /* realloc options->extension */
+    mysql->options.extension= (struct st_mysql_options_extension *)
+                              calloc(1, sizeof(struct st_mysql_options_extension));
+    if (!mysql->options.extension)
+    {
+      SET_CLIENT_ERROR(mysql, CR_OUT_OF_MEMORY, SQLSTATE_UNKNOWN, 0);
+      return NULL;
+    }
   }
 
   /* CONC-703: If no error was set, we set CR_SERVER_LOST by default */
@@ -2191,6 +2194,7 @@ my_bool STDCALL mariadb_reconnect(MYSQL *mysql)
   }
   tmp_mysql.free_me= 0;
   free(tmp_mysql.options.extension);
+  tmp_mysql.options.extension= NULL;
   tmp_mysql.options=mysql->options;
   if (mysql->extension->conn_hdlr)
   {
@@ -2445,6 +2449,7 @@ static void mysql_close_options(MYSQL *mysql)
   /* clear all pointer */
   free(mysql->options.extension);
   mysql->options.extension= NULL;
+  memset(&mysql->options, 0, sizeof(mysql->options));
 }
 
 static void mysql_close_memory(MYSQL *mysql)
