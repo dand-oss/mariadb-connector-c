@@ -116,8 +116,7 @@ static int native_password_auth_client(MYSQL_PLUGIN_VIO *vio, MYSQL *mysql)
       we use the old scramble.
     */
     pkt= (uchar*)mysql->scramble_buff;
-    pkt_len= SCRAMBLE_LENGTH + 1;
-    (void)pkt_len; /* infer */
+    pkt_len= SCRAMBLE_LENGTH + 1; // @infer-ignore DEAD_STORE
   }
   else
   {
@@ -298,9 +297,12 @@ static int send_client_reply_packet(MCPVIO_EXT *mpvio,
     proxy_header_len= mysql->options.extension->proxy_header_len;
 
   /* see end= buff+32 below, fixed size of the packet is 32 bytes */
-  buff= malloc(33 + USERNAME_LENGTH + data_len + NAME_LEN + NAME_LEN + conn_attr_len + 9);
-  end= buff;
-  (void)end; /* make infer happy */
+  if (!(buff= malloc(33 + USERNAME_LENGTH + data_len + NAME_LEN + NAME_LEN + conn_attr_len + 9)))
+  {
+    my_set_error(mysql, CR_OUT_OF_MEMORY, SQLSTATE_UNKNOWN, 0);
+    goto error;
+  }
+  end= buff; // @infer-ignore DEAD_STORE
 
   mysql->client_flag|= mysql->options.client_flag;
   mysql->client_flag|= CLIENT_CAPABILITIES;

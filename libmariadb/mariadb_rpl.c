@@ -634,7 +634,7 @@ mariadb_rpl_extract_rows(MARIADB_RPL *rpl,
 
         case MYSQL_TYPE_TIMESTAMP2:
         {
-          MYSQL_TIME tm;
+          MYSQL_TIME tm= {0};
           size_t sp_len;
 
           if (pos + 4 > end)
@@ -1429,7 +1429,7 @@ MARIADB_RPL_EVENT * STDCALL mariadb_rpl_fetch(MARIADB_RPL *rpl, MARIADB_RPL_EVEN
       ev+= strlen((char *)ev);
       /* terminating zero */
       RPL_CHECK_POS(ev, ev_end, 1);
-      ev++;
+      ev++; // @infer-ignore DEAD_STORE
       break;
 
     case START_ENCRYPTION_EVENT:
@@ -1440,7 +1440,7 @@ MARIADB_RPL_EVENT * STDCALL mariadb_rpl_fetch(MARIADB_RPL *rpl, MARIADB_RPL_EVEN
       ev+= 4;
       memcpy(rpl_event->event.start_encryption.nonce, ev, 12);
       memcpy(rpl->nonce, ev, 12);
-      ev+= 12;
+      ev+= 12; // @infer-ignore DEAD_STORE
       rpl->encrypted= 1;
       break;
 
@@ -1484,7 +1484,7 @@ MARIADB_RPL_EVENT * STDCALL mariadb_rpl_fetch(MARIADB_RPL *rpl, MARIADB_RPL_EVEN
       len= rpl_event->event_length - (ev - ev_start) - (rpl->use_checksum ? 4 : 0) - (EVENT_HEADER_OFS - 1);
       RPL_CHECK_POS(ev, ev_end, len);
       rpl_set_string_and_len(&rpl_event->event.execute_load_query.statement, ev, len);
-      ev+= len;
+      ev+= len; // @infer-ignore DEAD_STORE
       break;
     }
     case BINLOG_CHECKPOINT_EVENT:
@@ -1498,7 +1498,7 @@ MARIADB_RPL_EVENT * STDCALL mariadb_rpl_fetch(MARIADB_RPL *rpl, MARIADB_RPL_EVEN
       rpl_set_string_and_len(&rpl_event->event.checkpoint.filename, ev, len);
       if (ma_set_rpl_filename(rpl, ev, len))
         goto mem_error;
-      ev+= len;
+      ev+= len; // @infer-ignore DEAD_STORE
       break;
 
     case FORMAT_DESCRIPTION_EVENT:
@@ -1557,7 +1557,7 @@ MARIADB_RPL_EVENT * STDCALL mariadb_rpl_fetch(MARIADB_RPL *rpl, MARIADB_RPL_EVEN
       if ((rpl->use_checksum= *ev++))
       {
         rpl_event->checksum= uint4korr(ev);
-        ev+= 4;
+        ev+= 4; // @infer-ignore DEAD_STORE
       }
       break;
     }
@@ -1708,7 +1708,7 @@ MARIADB_RPL_EVENT * STDCALL mariadb_rpl_fetch(MARIADB_RPL *rpl, MARIADB_RPL_EVEN
       rpl_event->event.rand.first_seed= uint8korr(ev);
       ev+= 8;
       rpl_event->event.rand.second_seed= uint8korr(ev);
-      ev+= 8;
+      ev+= 8; // @infer-ignore DEAD_STORE
 
       break;
 
@@ -1717,7 +1717,7 @@ MARIADB_RPL_EVENT * STDCALL mariadb_rpl_fetch(MARIADB_RPL *rpl, MARIADB_RPL_EVEN
       rpl_event->event.intvar.type= *ev;
       ev++;
       rpl_event->event.intvar.value= uint8korr(ev);
-      ev+= 8;
+      ev+= 8; // @infer-ignore DEAD_STORE
       break;
 
     case USER_VAR_EVENT:
@@ -1799,7 +1799,7 @@ MARIADB_RPL_EVENT * STDCALL mariadb_rpl_fetch(MARIADB_RPL *rpl, MARIADB_RPL_EVEN
         ev+= len;
         if ((unsigned long)(ev - rpl_event->raw_data) < rpl_event->raw_data_size)
           rpl_event->event.uservar.flags= *ev;
-        ev++;
+        ev++; // @infer-ignore DEAD_STORE
       }
       break;
 
@@ -1837,7 +1837,7 @@ MARIADB_RPL_EVENT * STDCALL mariadb_rpl_fetch(MARIADB_RPL *rpl, MARIADB_RPL_EVEN
       if (ma_set_rpl_filename(rpl, ev, len))
         goto mem_error;
 
-      ev+= len;
+      ev+= len; // @infer-ignore DEAD_STORE
       break;
 
     case XID_EVENT:
@@ -1905,7 +1905,7 @@ MARIADB_RPL_EVENT * STDCALL mariadb_rpl_fetch(MARIADB_RPL *rpl, MARIADB_RPL_EVEN
       {
         rpl_event->event.previous_gtid.content.data= ev;
         rpl_event->event.previous_gtid.content.length= len;
-        ev+= len;
+        ev+= len; // @infer-ignore DEAD_STORE
       }
       break;
     }
@@ -1927,7 +1927,7 @@ MARIADB_RPL_EVENT * STDCALL mariadb_rpl_fetch(MARIADB_RPL *rpl, MARIADB_RPL_EVEN
       memcpy(rpl_event->event.gtid_log.source_id, ev, 16);
       ev+= 16;
       rpl_event->event.gtid_log.sequence_nr= uint8korr(ev);
-      ev+= 8;
+      ev+= 8; // @infer-ignore DEAD_STORE
       break;
 
     case GTID_EVENT:
@@ -1959,7 +1959,7 @@ MARIADB_RPL_EVENT * STDCALL mariadb_rpl_fetch(MARIADB_RPL *rpl, MARIADB_RPL_EVEN
       {
         RPL_CHECK_POS(ev, ev_end, 8);
         rpl_event->event.gtid.commit_id= uint8korr(ev);
-        ev+= 8;
+        ev+= 8; // @infer-ignore DEAD_STORE
       }
       else if (rpl_event->event.gtid.flags & (FL_PREPARED_XA | FL_COMPLETED_XA))
       {
@@ -1974,10 +1974,10 @@ MARIADB_RPL_EVENT * STDCALL mariadb_rpl_fetch(MARIADB_RPL *rpl, MARIADB_RPL_EVEN
         len= rpl_event->event.gtid.gtrid_len + rpl_event->event.gtid.bqual_len;
         RPL_CHECK_POS(ev, ev_end, len);
         rpl_set_string_and_len(&rpl_event->event.gtid.xid, ev, len);
-        ev+= len;
+        ev+= len; // @infer-ignore DEAD_STORE
       }
       else
-        ev+= 6;
+        ev+= 6; // @infer-ignore DEAD_STORE
       break;
 
     case GTID_LIST_EVENT:
@@ -2292,8 +2292,13 @@ int STDCALL mariadb_rpl_optionsv(MARIADB_RPL *rpl,
     rpl->filename= NULL;
     if (rpl->filename_length)
     {
-      rpl->filename= (char *)malloc(rpl->filename_length);
-      memcpy((void *)rpl->filename, arg1, rpl->filename_length);
+      if ((rpl->filename= (char *)malloc(rpl->filename_length)))
+        memcpy((void *)rpl->filename, arg1, rpl->filename_length);
+      else {
+        va_end(ap);
+        rpl_set_error(rpl, CR_OUT_OF_MEMORY, 0);
+        return 1;
+      }
     }
     else if (arg1)
     {

@@ -3702,7 +3702,7 @@ mariadb_dyncol_check(DYNAMIC_COLUMN *str)
 
     if (header.format == dyncol_fmt_num)
     {
-       num= uint2korr(header.entry);
+       num= uint2korr(header.entry); // @infer-ignore DEAD_STORE
     }
     else
     {
@@ -4108,7 +4108,7 @@ static enum enum_dyncol_func_result
 mariadb_dyncol_json_internal(DYNAMIC_COLUMN *str, DYNAMIC_STRING *json,
                              uint lvl)
 {
-  DYN_HEADER header;
+  DYN_HEADER header= {0};
   uint i;
   enum enum_dyncol_func_result rc;
 
@@ -4244,7 +4244,7 @@ mariadb_dyncol_unpack(DYNAMIC_COLUMN *str,
                       uint *count,
                       LEX_STRING **names, DYNAMIC_COLUMN_VALUE **vals)
 {
-  DYN_HEADER header;
+  DYN_HEADER header= {0};
   char *nm;
   uint i;
   enum enum_dyncol_func_result rc;
@@ -4348,7 +4348,7 @@ err:
 enum enum_dyncol_func_result
 mariadb_dyncol_column_count(DYNAMIC_COLUMN *str, uint *column_count)
 {
-  DYN_HEADER header;
+  DYN_HEADER header= {0};
   enum enum_dyncol_func_result rc;
 
   (*column_count)= 0;
