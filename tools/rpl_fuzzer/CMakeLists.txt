@@ -16,6 +16,8 @@ target_include_directories(rpl_fuzzer PRIVATE
     ${CMAKE_SOURCE_DIR}/libmariadb
 )
 
+#target_link_options(rpl_fuzzer PRIVATE "-Wl,--wrap=malloc" "-Wl,--wrap=calloc")
+
 #  Link against the internal mariadb library target and zlib
 # 'mariadb_obj' or 'libmariadb' ensures it links statically or directly to the object files
 target_link_libraries(rpl_fuzzer PRIVATE
