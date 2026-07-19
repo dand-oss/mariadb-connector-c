@@ -45,32 +45,34 @@ Instead of committing massive binary logs directly to the repository, you can ge
 
 ## Step-by-Step Seed Generation
 
-### 1. Create the target data folder
+### 1. Create the target data and corpus folder
 
 ```bash
 mkdir -p data/
+mkdir -p corpus/
 ```
 
 ---
 
 ### 2. Generate Replication Seeds
+To get better coverage run the unittest suite both against MySQL and MariaDB servers.
 
 #### SBR (Statement based replication)
 
 Change your server settings to statement based replication (binlog_format=Statement), flush your logs and
-run the unittest suite. Afterwards copy the first binlog file to the data folder and rename it.
+run the unittest suite. Afterwards copy the binlog files to the data folder and rename it.
 
 #### RBR (Row based replication)
 
 Change your server settings to statement based replication (binlog_format=Row), flush your logs and
-run the unittest suite. Afterwards copy the first binlog file to the data folder and rename it.
+run the unittest suite. Afterwards copy the binlog files to the data folder and rename it.
 
 #### Compressed Row/Query Seeds
 
 For both SBR and RBR set the global variable binlog_compression to ON, run the unittest suite and copy
-the first binlog file to the data folder and rename it.
+the binlog files to the data folder and rename it.
 
----
+
 
 ## Running the Fuzzer
 
@@ -79,7 +81,7 @@ Once the `data/` folder contains your valid seeds, you can unleash the fuzzer ac
 For high-core systems use the following configuration to deploy 10 parallel background workers while maintaining operating system stability:
 
 ```bash
-./rpl_fuzzer -max_len=131072 -workers=10 -jobs=10 $(pwd)/data/
+./rpl_fuzzer -max_len=131072 -workers=10 -jobs=10 $(pwd)/corpus $(pwd)/data/
 ```
 
 ---
