@@ -461,7 +461,10 @@ IF(WITH_MYSQLCOMPAT)
   ENDIF()
 ENDIF()
 
-create_symlink(libmariadb${CMAKE_STATIC_LIBRARY_SUFFIX} mariadbclient ${INSTALL_LIBDIR})
+# In DEB layout, mariadbclient is already named libmariadb.a — skip the symlink.
+IF(NOT INSTALL_LAYOUT STREQUAL "DEB")
+  create_symlink(libmariadb${CMAKE_STATIC_LIBRARY_SUFFIX} mariadbclient ${INSTALL_LIBDIR})
+ENDIF()
 
 SET_TARGET_PROPERTIES(libmariadb PROPERTIES VERSION
  ${CPACK_PACKAGE_VERSION_MAJOR}
