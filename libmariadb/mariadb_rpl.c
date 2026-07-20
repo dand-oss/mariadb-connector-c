@@ -1588,7 +1588,7 @@ MARIADB_RPL_EVENT * STDCALL mariadb_rpl_fetch(MARIADB_RPL *rpl, MARIADB_RPL_EVEN
       RPL_CHECK_POS(ev, ev_end, len);
       rpl_event->event.heartbeat.filename.length= len;
       rpl_event->event.heartbeat.filename.str= (char *)ev;
-      ev+= len;
+      ev+= len; // @infer-ignore DEAD_STORE
       break;
     }
 
@@ -1659,7 +1659,7 @@ MARIADB_RPL_EVENT * STDCALL mariadb_rpl_fetch(MARIADB_RPL *rpl, MARIADB_RPL_EVEN
       ev+= 4;
       rpl_event->event.execute_load_query.ofs2= uint4korr(ev);
       ev+= 4;
-      rpl_event->event.execute_load_query.duplicate_flag= *ev++;
+      rpl_event->event.execute_load_query.duplicate_flag= *ev;
 
       ev= ev_start + post_header_len;
 
@@ -1836,7 +1836,6 @@ MARIADB_RPL_EVENT * STDCALL mariadb_rpl_fetch(MARIADB_RPL *rpl, MARIADB_RPL_EVEN
       rpl_event->event.query.errornr= uint2korr(ev);
       ev+= 2;
       status_len= uint2korr(ev);
-      ev+= 2;
 
       ev= post_header_start + post_header_len;
 
@@ -1888,7 +1887,6 @@ MARIADB_RPL_EVENT * STDCALL mariadb_rpl_fetch(MARIADB_RPL *rpl, MARIADB_RPL_EVEN
         source_len= (uLongf)(len - header_size);
         dest_len= (uLongf)uncompressed_len;
 
-        len-= header_size;
         if (!(rpl_event->event.query.statement.str = ma_calloc_root(&rpl_event->memroot, uncompressed_len)))
           goto mem_error;
 
@@ -1936,7 +1934,6 @@ MARIADB_RPL_EVENT * STDCALL mariadb_rpl_fetch(MARIADB_RPL *rpl, MARIADB_RPL_EVEN
 
       /* Post header */
       rpl_event->event.table_map.table_id= uint6korr(ev);
-      ev+= 8;  /* 2 byte in header ignored */
 
       ev= post_header_start + post_header_len;
 
@@ -2202,7 +2199,7 @@ MARIADB_RPL_EVENT * STDCALL mariadb_rpl_fetch(MARIADB_RPL *rpl, MARIADB_RPL_EVEN
       RPL_CHECK_POS(ev, ev_end, 8);
 
       rpl_event->event.xid.transaction_nr= uint8korr(ev);
-      ev+= 8;
+      ev+= 8; // @infer-ignore DEAD_STORE
       break;
     }
     case XA_PREPARE_LOG_EVENT:
@@ -2246,7 +2243,7 @@ MARIADB_RPL_EVENT * STDCALL mariadb_rpl_fetch(MARIADB_RPL *rpl, MARIADB_RPL_EVEN
 
       RPL_CHECK_POS(ev, ev_end, len);
       rpl_set_string_and_len(&rpl_event->event.xa_prepare_log.xid, ev, len);
-      ev+= len;
+      ev+= len; // @infer-ignore DEAD_STORE
       break;
     }
 
@@ -2265,7 +2262,7 @@ MARIADB_RPL_EVENT * STDCALL mariadb_rpl_fetch(MARIADB_RPL *rpl, MARIADB_RPL_EVEN
 
       RPL_CHECK_POS(ev, ev_end, post_header_len);
       /* no post header data processed */
-      ev= post_header_start + post_header_len;
+      ev= post_header_start + post_header_len; // @infer-ignore DEAD_STORE
       break;
     }
     case PREVIOUS_GTIDS_LOG_EVENT:
@@ -2335,7 +2332,7 @@ MARIADB_RPL_EVENT * STDCALL mariadb_rpl_fetch(MARIADB_RPL *rpl, MARIADB_RPL_EVEN
 
       RPL_CALC_SAFE_LEN(ev, ev_end, rpl->use_checksum, len, malformed_packet);
       if (len > 0)
-        ev += len;
+        ev += len; // @infer-ignore DEAD_STORE
 
       break;
     }
@@ -2414,7 +2411,7 @@ MARIADB_RPL_EVENT * STDCALL mariadb_rpl_fetch(MARIADB_RPL *rpl, MARIADB_RPL_EVEN
       RPL_CHECK_POS(ev, ev_end, post_header_len);
 
       gtid_cnt= rpl_event->event.gtid_list.gtid_cnt= uint4korr(ev);
-      ev+=4;
+      ev+=4; // @infer-ignore DEAD_STORE
 
       if (gtid_cnt > (MAX_PACKET_LENGTH / 16))
         goto malformed_packet;
@@ -2445,7 +2442,7 @@ MARIADB_RPL_EVENT * STDCALL mariadb_rpl_fetch(MARIADB_RPL *rpl, MARIADB_RPL_EVEN
 
     case WRITE_ROWS_COMPRESSED_EVENT_V1:
     case UPDATE_ROWS_COMPRESSED_EVENT_V1:
-     case DELETE_ROWS_COMPRESSED_EVENT_V1:
+    case DELETE_ROWS_COMPRESSED_EVENT_V1:
     case WRITE_ROWS_EVENT_V1:
     case UPDATE_ROWS_EVENT_V1:
     case DELETE_ROWS_EVENT_V1:
@@ -2498,8 +2495,6 @@ MARIADB_RPL_EVENT * STDCALL mariadb_rpl_fetch(MARIADB_RPL *rpl, MARIADB_RPL_EVEN
       if (rpl_event->event_type >= WRITE_ROWS_COMPRESSED_EVENT) {
         rpl_event->event.rows.compressed= 1;
         rpl_event->event.rows.type= rpl_event->event_type - WRITE_ROWS_COMPRESSED_EVENT;
-        ev= ev_end;
-        return rpl_event;
       } else if (rpl_event->event_type >= WRITE_ROWS_COMPRESSED_EVENT_V1) {
         rpl_event->event.rows.compressed= 1;
         rpl_event->event.rows.type= rpl_event->event_type - WRITE_ROWS_COMPRESSED_EVENT_V1;
@@ -2708,8 +2703,13 @@ int STDCALL mariadb_rpl_optionsv(MARIADB_RPL *rpl,
     rpl->filename= NULL;
     if (rpl->filename_length)
     {
-      rpl->filename= (char *)malloc(rpl->filename_length);
-      memcpy((void *)rpl->filename, arg1, rpl->filename_length);
+      if ((rpl->filename= (char *)malloc(rpl->filename_length)))
+        memcpy((void *)rpl->filename, arg1, rpl->filename_length);
+      else {
+        va_end(ap);
+        rpl_set_error(rpl, CR_OUT_OF_MEMORY, 0);
+        return 1;
+      }
     }
     else if (arg1)
     {
