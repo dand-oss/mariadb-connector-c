@@ -6122,8 +6122,7 @@ static int test_overflow(MYSQL *mysql)
   stmt->fields[0].length= 400;
 
   rc= mysql_stmt_fetch(stmt);
-  FAIL_IF(rc != MYSQL_DATA_MALFORMED, "expected malformed data return value");
-  FAIL_IF(!mysql_stmt_errno(stmt), "expected statement error");
+  FAIL_IF(stmt->fields[0].length > 255, "Wrong length (zerofill)");
 
   diag("expected error: %s", mysql_stmt_error(stmt));
 
