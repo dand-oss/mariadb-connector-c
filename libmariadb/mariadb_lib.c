@@ -4279,7 +4279,7 @@ mysql_get_optionv(MYSQL *mysql, enum mysql_option option, void *arg, ...)
     *((my_bool*)arg)= mysql->options.extension ? mysql->options.extension->skip_read_response : 0;
     break;
   case MARIADB_OPT_BULK_UNIT_RESULTS:
-    *((unsigned int*)arg)= mysql->options.extension ? mysql->options.extension->bulk_unit_results : 0;
+    *((my_bool *)arg)= mysql->options.extension ? mysql->options.extension->bulk_unit_results : 0;
     break;
   case MARIADB_OPT_MAX_COLUMNS:
     *((unsigned int *)arg)= mysql->options.extension->max_columns;
