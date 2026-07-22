@@ -855,7 +855,79 @@ static int test_conc624(MYSQL *mysql)
   return OK;
 }
 
+char* generate_too_many_columns_query(void)
+{
+    size_t col_count = 65536;
+    size_t buffer_size = 7 + (col_count * 2) + 1; 
+    char *query = malloc(buffer_size);
+    char *p = query;
+
+    if (!query)
+      return NULL;
+    p += sprintf(p, "SELECT ");
+
+    for (size_t i = 0; i < col_count - 1; i++) {
+        *p++ = '1';
+        *p++ = ',';
+    }
+    *p++ = '1';
+    *p = '\0';
+
+    return query;
+}
+
+static int test_maxcolumns(MYSQL *mysql)
+{
+  unsigned int check_max_columns;
+  unsigned int max_columns= 4;
+  my_bool reconnect=1;
+  int rc;
+  char query[128];
+  char *long_query;
+
+  if (!(long_query= generate_too_many_columns_query()))
+    return FAIL;
+
+  rc= mysql_query(mysql, long_query);
+  free(long_query);
+  FAIL_IF(!mysql_errno(mysql) || !rc, "Error expected");
+
+  rc= mysql_optionsv(mysql, MARIADB_OPT_MAX_COLUMNS, &max_columns);
+  check_mysql_rc(rc, mysql);
+
+  rc= mysql_get_optionv(mysql, MARIADB_OPT_MAX_COLUMNS, &check_max_columns);
+  check_mysql_rc(rc, mysql);
+  FAIL_IF(max_columns != check_max_columns, "max_columns != check_max_columns");
+
+  rc= mysql_query(mysql, "SELECT 1,2,3,4,5");
+  FAIL_IF(!mysql_errno(mysql) || !rc, "Error expected");
+
+  rc= mysql_optionsv(mysql, MYSQL_OPT_RECONNECT, &reconnect);
+  check_mysql_rc(rc, mysql);
+
+  sprintf(query, "KILL %lu", mysql_thread_id(mysql));
+  rc= mysql_query(mysql, query);
+
+  sleep(5);
+
+  rc= mysql_ping(mysql);
+  rc= mysql_query(mysql, "SELECT 1,2,3,4,5");
+  FAIL_IF(!mysql_errno(mysql) || !rc, "Error expected");
+
+  max_columns= 0xFFFF;
+  rc= mysql_optionsv(mysql, MARIADB_OPT_MAX_COLUMNS, &max_columns);
+  check_mysql_rc(rc, mysql);
+  rc= mysql_get_optionv(mysql, MARIADB_OPT_MAX_COLUMNS, &check_max_columns);
+  check_mysql_rc(rc, mysql);
+  FAIL_IF(max_columns != check_max_columns, "max_columns != check_max_columns");
+
+  rc= mysql_query(mysql, "SELECT 1,2,3,4,5");
+  check_mysql_rc(rc, mysql);
+  return OK;
+}
+
 struct my_tests_st my_tests[] = {
+  {"test_maxcolumns", test_maxcolumns, TEST_CONNECTION_NEW, 0, NULL, NULL},
   {"test_conc624", test_conc624, TEST_CONNECTION_DEFAULT, 0, NULL, NULL},
   {"test_conc75", test_conc75, TEST_CONNECTION_DEFAULT, 0,  NULL,  NULL},
   {"test_conc74", test_conc74, TEST_CONNECTION_DEFAULT, 0,  NULL,  NULL},

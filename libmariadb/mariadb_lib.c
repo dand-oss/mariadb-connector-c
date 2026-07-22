@@ -741,6 +741,7 @@ struct st_default_options mariadb_defaults[] =
   {{MYSQL_OPT_SSL_ENFORCE}, MARIADB_OPTION_BOOL, "tls-enforce"},
   {{MYSQL_OPT_SSL_VERIFY_SERVER_CERT}, MARIADB_OPTION_BOOL,"tls-verify-peer"},
   {{MARIADB_OPT_RESTRICTED_AUTH}, MARIADB_OPTION_STR, "restricted-auth"},
+  {{MARIADB_OPT_MAX_COLUMNS}, MARIADB_OPTION_INT, "restricted-auth"},
   {{MYSQL_OPT_ZSTD_COMPRESSION_LEVEL}, MARIADB_OPTION_INT, "zstd-compression-level"},
   {{0}, 0, NULL}
 };
@@ -1435,6 +1436,7 @@ mysql_init(MYSQL *mysql)
   mysql->extension->auto_local_infile= ENABLED_LOCAL_INFILE == LOCAL_INFILE_MODE_AUTO
                                        ? WAIT_FOR_QUERY : ALWAYS_ACCEPT;
   mysql->options.reconnect= 0;
+  mysql->options.extension->max_columns= MAX_RESULT_COLUMNS;
   return mysql;
 error:
   if (mysql->free_me)
@@ -3009,6 +3011,13 @@ get_info:
     goto get_info;				/* Get info packet */
   }
 
+  if (field_count > mysql->options.extension->max_columns)
+  {
+    my_set_error(mysql, CR_ERR_TOO_MUCH_COLUMNS, SQLSTATE_UNKNOWN, 0, field_count, mysql->options.extension->max_columns);
+    mysql->net.error= 2;
+    return(-1);
+  }
+
   has_metadata= 1;
   if (ma_supports_cache_metadata(mysql))
   {
@@ -4026,6 +4035,9 @@ mysql_optionsv(MYSQL *mysql,enum mysql_option option, ...)
   case MARIADB_OPT_BULK_UNIT_RESULTS:
     mysql->options.extension->bulk_unit_results= *(my_bool *)arg1;
     break;
+  case MARIADB_OPT_MAX_COLUMNS:
+    mysql->options.extension->max_columns= *(unsigned int *)arg1;
+    break;
   case MARIADB_OPT_TLS_VERIFICATION_CALLBACK:
     if (!arg1)
     {
@@ -4267,7 +4279,10 @@ mysql_get_optionv(MYSQL *mysql, enum mysql_option option, void *arg, ...)
     *((my_bool*)arg)= mysql->options.extension ? mysql->options.extension->skip_read_response : 0;
     break;
   case MARIADB_OPT_BULK_UNIT_RESULTS:
-    *((my_bool *)arg)= mysql->options.extension ? mysql->options.extension->bulk_unit_results : 0;
+    *((unsigned int*)arg)= mysql->options.extension ? mysql->options.extension->bulk_unit_results : 0;
+    break;
+  case MARIADB_OPT_MAX_COLUMNS:
+    *((unsigned int *)arg)= mysql->options.extension->max_columns;
     break;
   default:
     va_end(ap);
