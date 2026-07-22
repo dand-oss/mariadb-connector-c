@@ -857,7 +857,7 @@ static int test_conc624(MYSQL *mysql)
 
 char* generate_too_many_columns_query(void)
 {
-    size_t col_count = 65536;
+    size_t col_count = MAX_RESULT_COLUMNS + 10;
     size_t buffer_size = 7 + (col_count * 2) + 1; 
     char *query = malloc(buffer_size);
     char *p = query;
