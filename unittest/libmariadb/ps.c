@@ -5350,7 +5350,68 @@ static int test_conc812(MYSQL *mysql)
   return OK;
 }
 
+static int test_vector(MYSQL *mysql)
+{
+  MYSQL_STMT *stmt;
+  int rc;
+  MYSQL_BIND bind;
+  float f1[4] = {1.0, 1.1, 1.2, 1.3};
+  float f2[4] = {0.0};
+
+  rc= mysql_query(mysql, "DROP TABLE IF EXISTS my_vector");
+  check_mysql_rc(rc, mysql);
+
+  rc= mysql_query(mysql, "CREATE TABLE my_vector(a vector(4))");
+
+  if (rc) {
+    diag("Server doesn't support vector");
+    return SKIP;
+  }
+
+
+  stmt= mysql_stmt_init(mysql);
+  rc= mysql_stmt_prepare(stmt, SL("INSERT INTO my_vector VALUES (?)"));
+  check_stmt_rc(rc, stmt);
+
+  memset(&bind, 0, sizeof(MYSQL_BIND));
+  bind.buffer= f1;
+  bind.buffer_type= MYSQL_TYPE_VECTOR;
+  bind.buffer_length = sizeof(float) * 4;
+  rc= mysql_stmt_bind_param(stmt, &bind);
+  check_stmt_rc(rc, stmt);
+
+  rc= mysql_stmt_execute(stmt);
+  check_stmt_rc(rc, stmt);
+
+  rc= mysql_stmt_prepare(stmt, SL("SELECT a FROM my_vector"));
+  check_stmt_rc(rc, stmt);
+
+  rc= mysql_stmt_execute(stmt);
+  check_stmt_rc(rc, stmt);
+
+  memset(&bind, 0, sizeof(MYSQL_BIND));
+  bind.buffer= &f2;
+  bind.buffer_length= sizeof(float) * 4;
+  rc= mysql_stmt_bind_result(stmt, &bind);
+  check_stmt_rc(rc, stmt);
+
+  rc= mysql_stmt_fetch(stmt);
+  check_stmt_rc(rc, stmt);
+
+  mysql_stmt_close(stmt);
+
+  if (memcmp(f1, f2, sizeof(float) * 4))
+  {
+    diag("Error: f1 != f2");
+    return FAIL;
+  }
+
+  return OK;
+}
+
+
 struct my_tests_st my_tests[] = {
+  {"test_vector", test_vector, TEST_CONNECTION_DEFAULT, 0, NULL, NULL},
   {"test_conc691", test_conc691, TEST_CONNECTION_DEFAULT, 0, NULL, NULL},
   {"test_conc812", test_conc812, TEST_CONNECTION_DEFAULT, 0, NULL, NULL},
   {"test_conc565", test_conc565, TEST_CONNECTION_DEFAULT, 0, NULL, NULL},

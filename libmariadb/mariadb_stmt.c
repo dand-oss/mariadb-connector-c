@@ -174,6 +174,7 @@ my_bool mthd_supported_buffer_type(enum enum_field_types type)
   case MYSQL_TYPE_TINY_BLOB:
   case MYSQL_TYPE_VAR_STRING:
   case MYSQL_TYPE_YEAR:
+  case MYSQL_TYPE_VECTOR:
     return 1;
   default:
     return 0;
@@ -453,7 +454,14 @@ int mthd_stmt_fetch_to_bind(MYSQL_STMT *stmt, unsigned char *row, ulong length)
     MYSQL_BIND *bind= &stmt->bind[i];
     MYSQL_PS_CONVERSION *ps_fetch_func= &mysql_ps_fetch_functions[field->type];
     int pack_len= ps_fetch_func->pack_len;
+    char errmsg[MYSQL_ERRMSG_SIZE];
 
+    /* Check if conversion for type is supported (MYSQL_TYPE_VECTOR crashed before) */
+    if (!ps_fetch_func->func) {
+      snprintf(errmsg, sizeof(errmsg)-1, "Unknow/unsupported field type: %d", field->type);
+      stmt_set_error(stmt, CR_MALFORMED_PACKET, SQLSTATE_UNKNOWN, errmsg);
+      return MYSQL_DATA_MALFORMED;
+    }
 
     /* save row position for fetching values in pieces */
     if (*null_ptr & bit_offset)
@@ -474,7 +482,6 @@ int mthd_stmt_fetch_to_bind(MYSQL_STMT *stmt, unsigned char *row, ulong length)
       ulong data_len;
       size_t packet_left;
       uchar *tmp_row= row;
-      char errmsg[MYSQL_ERRMSG_SIZE];
 
       bind->u.row_ptr= row;
 
@@ -745,6 +752,7 @@ int store_param(MYSQL_STMT *stmt, int column, unsigned char **p, unsigned long r
   case MYSQL_TYPE_MEDIUM_BLOB:
   case MYSQL_TYPE_LONG_BLOB:
   case MYSQL_TYPE_BLOB:
+  case MYSQL_TYPE_VECTOR:
   case MYSQL_TYPE_VARCHAR:
   case MYSQL_TYPE_VAR_STRING:
   case MYSQL_TYPE_STRING:
@@ -869,6 +877,10 @@ unsigned char* ma_stmt_execute_generate_simple_request(MYSQL_STMT *stmt, size_t 
       {
         /* this differs from mysqlnd, c api supports unsigned !! */
         uint buffer_type= stmt->params[i].buffer_type | (stmt->params[i].is_unsigned ? 32768 : 0);
+        if (buffer_type == MYSQL_TYPE_VECTOR &&
+           !(stmt->mysql->server_capabilities & CLIENT_MYSQL)) {
+          buffer_type= MYSQL_TYPE_BLOB;
+        }
         /* check if parameter requires indicator variable */
         int2store(p, buffer_type);
         p+= 2;
@@ -897,6 +909,7 @@ unsigned char* ma_stmt_execute_generate_simple_request(MYSQL_STMT *stmt, size_t 
         case MYSQL_TYPE_MEDIUM_BLOB:
         case MYSQL_TYPE_LONG_BLOB:
         case MYSQL_TYPE_BLOB:
+        case MYSQL_TYPE_VECTOR:
         case MYSQL_TYPE_VARCHAR:
         case MYSQL_TYPE_VAR_STRING:
         case MYSQL_TYPE_STRING:
@@ -1074,6 +1087,10 @@ unsigned char* ma_stmt_execute_generate_bulk_request(MYSQL_STMT *stmt, size_t *r
       {
         /* this differs from mysqlnd, c api supports unsigned !! */
         uint buffer_type= stmt->params[i].buffer_type | (stmt->params[i].is_unsigned ? 32768 : 0);
+        if (buffer_type == MYSQL_TYPE_VECTOR &&
+           !(stmt->mysql->server_capabilities & CLIENT_MYSQL)) {
+          buffer_type= MYSQL_TYPE_BLOB;
+        }
         int2store(p, buffer_type);
         p+= 2;
       }
@@ -1120,6 +1137,7 @@ unsigned char* ma_stmt_execute_generate_bulk_request(MYSQL_STMT *stmt, size_t *r
           case MYSQL_TYPE_MEDIUM_BLOB:
           case MYSQL_TYPE_LONG_BLOB:
           case MYSQL_TYPE_BLOB:
+          case MYSQL_TYPE_VECTOR:
           case MYSQL_TYPE_VARCHAR:
           case MYSQL_TYPE_VAR_STRING:
           case MYSQL_TYPE_STRING:
@@ -1413,6 +1431,7 @@ my_bool STDCALL mysql_stmt_bind_param(MYSQL_STMT *stmt, MYSQL_BIND *bind)
       case MYSQL_TYPE_JSON:
       case MYSQL_TYPE_VAR_STRING:
       case MYSQL_TYPE_BLOB:
+      case MYSQL_TYPE_VECTOR:
       case MYSQL_TYPE_TINY_BLOB:
       case MYSQL_TYPE_MEDIUM_BLOB:
       case MYSQL_TYPE_LONG_BLOB:
