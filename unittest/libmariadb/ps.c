@@ -5355,7 +5355,7 @@ static int test_vector(MYSQL *mysql)
   MYSQL_STMT *stmt;
   int rc;
   MYSQL_BIND bind;
-  float f1[4] = {1.0, 1.1, 1.2, 1.3};
+  float f1[4] = {1.0f, 1.1f, 1.2f, 1.3f};
   float f2[4] = {0.0};
 
   rc= mysql_query(mysql, "DROP TABLE IF EXISTS my_vector");
