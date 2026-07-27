@@ -1250,6 +1250,7 @@ MYSQL_DATA *mthd_my_read_rows(MYSQL *mysql,MYSQL_FIELD *mysql_fields,
 
   while (*(cp=net->read_pos) != 254 || pkt_len >= 8)
   {
+    uchar *end_cp;
     result->rows++;
     if (!(cur= (MYSQL_ROWS*) ma_alloc_root(&result->alloc,
 					    sizeof(MYSQL_ROWS))) ||
@@ -1263,10 +1264,15 @@ MYSQL_DATA *mthd_my_read_rows(MYSQL *mysql,MYSQL_FIELD *mysql_fields,
     }
     *prev_ptr=cur;
     prev_ptr= &cur->next;
+    end_cp= net->read_pos + pkt_len;
     to= (char*) (cur->data+fields+1);
     end_to=to+fields+pkt_len-1;
     for (field=0 ; field < fields ; field++)
     {
+      if (cp >= end_cp) {
+          cur->data[field]= 0;
+          continue;
+      }
       if ((len=(ulong) net_field_length(&cp)) == NULL_LENGTH)
       {						/* null field */
         cur->data[field] = 0;
@@ -1274,10 +1280,12 @@ MYSQL_DATA *mthd_my_read_rows(MYSQL *mysql,MYSQL_FIELD *mysql_fields,
       else
       {
         cur->data[field] = to;
-        if (len > (ulong)(end_to - to) || to > end_to)
+        if (len > (ulong)(end_to - to) ||
+            to > end_to ||
+            len > (ulong)(end_cp - cp))
         {
           free_rows(result);
-          SET_CLIENT_ERROR(mysql, CR_UNKNOWN_ERROR, SQLSTATE_UNKNOWN, 0);
+          SET_CLIENT_ERROR(mysql, CR_MALFORMED_PACKET, SQLSTATE_UNKNOWN, 0);
           return(0);
         }
         memcpy(to,(char*) cp,len); to[len]=0;
