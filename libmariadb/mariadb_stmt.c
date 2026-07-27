@@ -430,7 +430,13 @@ int mthd_stmt_fetch_to_bind(MYSQL_STMT *stmt, unsigned char *row, ulong length)
     MYSQL_BIND *bind= &stmt->bind[i];
     MYSQL_PS_CONVERSION *ps_fetch_func= &mysql_ps_fetch_functions[field->type];
     int pack_len= ps_fetch_func->pack_len;
+    char errmsg[MYSQL_ERRMSG_SIZE];
 
+    if (!ps_fetch_func->func) {
+      snprintf(errmsg, sizeof(errmsg)-1, "Unknow/unsupported field type: %d", field->type);
+      stmt_set_error(stmt, CR_MALFORMED_PACKET, SQLSTATE_UNKNOWN, errmsg);
+      return MYSQL_DATA_MALFORMED;
+    }
 
     /* save row position for fetching values in pieces */
     if (*null_ptr & bit_offset)
@@ -451,7 +457,6 @@ int mthd_stmt_fetch_to_bind(MYSQL_STMT *stmt, unsigned char *row, ulong length)
       ulong data_len;
       size_t packet_left;
       uchar *tmp_row= row;
-      char errmsg[MYSQL_ERRMSG_SIZE];
 
       bind->u.row_ptr= row;
 
