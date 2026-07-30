@@ -678,6 +678,12 @@ init_read_hdr(DYN_HEADER *hdr, DYNAMIC_COLUMN *str)
   calc_param(&hdr->entry_size, &hdr->header_size,
              fmt_data[hdr->format].fixed_hdr_entry, hdr->offset_size,
              hdr->column_count);
+
+  if (fmt_data[hdr->format].fixed_hdr + hdr->header_size + hdr->nmpool_size > str->length)
+  {
+    return ER_DYNCOL_FORMAT;
+  }
+
   hdr->nmpool= hdr->header + hdr->header_size;
   hdr->dtpool= hdr->nmpool + hdr->nmpool_size;
   hdr->data_size= str->length - fmt_data[hdr->format].fixed_hdr -
