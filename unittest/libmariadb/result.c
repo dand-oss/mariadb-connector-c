@@ -1247,7 +1247,8 @@ static int test_conc847_valid(MYSQL *mysql)
     FAIL_UNLESS(fields[0].type == MYSQL_TYPE_LONG, "Field type mismatch");
   }
 
-  /* Note: Successful unpack_fields frees old data internally via free_rows(data) */
+  /* FREE THE FIELD ALLOC ROOT TO PREVENT LEAK! */
+  ma_free_root(&mysql->field_alloc, MYF(0));
 
   return OK;
 }
