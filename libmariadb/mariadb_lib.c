@@ -1445,6 +1445,7 @@ mysql_init(MYSQL *mysql)
                                        ? WAIT_FOR_QUERY : ALWAYS_ACCEPT;
   mysql->options.reconnect= 0;
   mysql->options.extension->max_columns= MAX_RESULT_COLUMNS;
+  FIX_SSL_VERIFY_SERVER_CERT(&mysql->options);
   return mysql;
 error:
   if (mysql->free_me)
