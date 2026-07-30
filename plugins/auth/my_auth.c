@@ -872,12 +872,11 @@ retry:
       auth_plugin= &dummy_fallback_client_plugin;
 
     /* can we use this plugin with this tls server cert ? */
-    if ((mysql->net.tls_verify_status & MARIADB_TLS_VERIFY_TRUST) &&
+    if ((mysql->net.tls_verify_status) &&
         !password_and_hashing(mysql, auth_plugin))
     {
       my_set_error(mysql, CR_SSL_CONNECTION_ERROR, SQLSTATE_UNKNOWN,
-                   ER(CR_SSL_CONNECTION_ERROR),
-                   "Certificate verification failure: The certificate is NOT trusted.");
+                   ER(CR_SSL_CONNECTION_ERROR), "Certificate verification failure");
       return 1;
     }
     goto retry;
