@@ -1138,7 +1138,7 @@ static my_bool ma_get_rset_field_lengths(MYSQL_ROW row, unsigned int field_count
 MYSQL_FIELD *
 unpack_fields(const MYSQL *mysql,
               MYSQL_DATA *data, MA_MEM_ROOT *alloc, uint fields,
-	      my_bool default_value)
+              my_bool default_value)
 {
   MYSQL_ROWS	*row;
   MYSQL_FIELD	*field,*result;
@@ -1151,7 +1151,7 @@ unpack_fields(const MYSQL *mysql,
 
   for (row=data->data; row ; row = row->next,field++)
   {
-    unsigned long lengths[9];
+    unsigned long lengths[9]= {0};
 
     if (field >= result + fields)
       goto error;
@@ -1177,6 +1177,13 @@ unpack_fields(const MYSQL *mysql,
           ma_field_extension_init_type_info(alloc, ext, row->data[i], len);
       }
       i++;
+    }
+
+    /* Ensure row->data pointers for the binary metadata field exist */
+    if (!row->data[i] || (size_t)(row->data[i] - row->data[0]) + 12 > row->length)
+    {
+      SET_CLIENT_ERROR((MYSQL *)mysql, CR_MALFORMED_PACKET, SQLSTATE_UNKNOWN, 0);
+      goto error;
     }
 
     p= (char *)row->data[i];
@@ -1263,6 +1270,7 @@ MYSQL_DATA *mthd_my_read_rows(MYSQL *mysql,MYSQL_FIELD *mysql_fields,
     }
     *prev_ptr=cur;
     prev_ptr= &cur->next;
+    cur->length= pkt_len;
     to= (char*) (cur->data+fields+1);
     end_to=to+fields+pkt_len-1;
     for (field=0 ; field < fields ; field++)
