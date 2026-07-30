@@ -467,18 +467,30 @@ int mthd_stmt_fetch_to_bind(MYSQL_STMT *stmt, unsigned char *row, ulong length)
 
       packet_left= end - tmp_row;
 
-      /* The only length check that belongs here is the packet boundary: a
-         value cannot span more than the bytes left in the packet. Conversion
-         into the caller's buffer is bounded on its own (numeric parsing uses
-         explicit begin/end pointers, string copies use MIN(len,buffer_length)).
-         Field and value lengths are the server's business -- do not reject
-         them against hardcoded caps (display width, max decimal length): such
-         caps go stale as the server raises its limits and then reject valid
-         data, which is the CONC-820 regression this replaces. */
+      /* CONC-820: 1. Check sentinel */
       if (data_len > packet_left) {
         snprintf(errmsg, sizeof(errmsg)-1, "Malformed packet: Column %d has length %lu, while remaining space is %zu bytes", i, data_len, packet_left);
         stmt_set_error(stmt, CR_MALFORMED_PACKET, SQLSTATE_UNKNOWN, errmsg);
         return MYSQL_DATA_MALFORMED;
+      }
+
+      /* CONC-820: 2. Check if length exceeds max. lengths */
+      switch (stmt->fields[i].type) {
+        case MYSQL_TYPE_TINY:
+        case MYSQL_TYPE_SHORT:
+        case MYSQL_TYPE_INT24:
+        case MYSQL_TYPE_LONG:
+        case MYSQL_TYPE_LONGLONG:
+          if (field->flags & ZEROFILL_FLAG)
+            field->length= MIN(field->length, MAX_ZEROFILL_LEN);
+          else
+            field->length= MIN(field->length, 22);
+          break;
+        case MYSQL_TYPE_NEWDECIMAL:
+          field->length= MIN(field->length, MAX_DECIMAL_LEN);
+          break;
+        default:
+          break;
       }
 
       if (!stmt->bind_result_done ||
