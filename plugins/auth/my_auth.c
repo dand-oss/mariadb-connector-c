@@ -876,7 +876,7 @@ retry:
         !password_and_hashing(mysql, auth_plugin))
     {
       my_set_error(mysql, CR_SSL_CONNECTION_ERROR, SQLSTATE_UNKNOWN,
-                   ER(CR_SSL_CONNECTION_ERROR), "Certificate verification failure");
+                   ER(CR_SSL_CONNECTION_ERROR), "Failed to verify the server certificate");
       return 1;
     }
     goto retry;
