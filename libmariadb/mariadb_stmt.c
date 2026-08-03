@@ -481,13 +481,20 @@ int mthd_stmt_fetch_to_bind(MYSQL_STMT *stmt, unsigned char *row, ulong length)
         case MYSQL_TYPE_INT24:
         case MYSQL_TYPE_LONG:
         case MYSQL_TYPE_LONGLONG:
-          if (field->flags & ZEROFILL_FLAG)
-            field->length= MIN(field->length, MAX_ZEROFILL_LEN);
-          else
-            field->length= MIN(field->length, 22);
+          if (field->length > MAX_ZEROFILL_LEN) {
+            snprintf(errmsg, sizeof(errmsg) - 1, "Malformed packet: length is %lu, while maximum display length for column %d is %u bytes",
+                   field->length, i, MAX_ZEROFILL_LEN);
+            stmt_set_error(stmt, CR_MALFORMED_PACKET, SQLSTATE_UNKNOWN, errmsg);
+            return MYSQL_DATA_MALFORMED;
+          }
           break;
         case MYSQL_TYPE_NEWDECIMAL:
-          field->length= MIN(field->length, MAX_DECIMAL_LEN);
+          if (data_len > MAX_DECIMAL_LEN || field->length > MAX_DECIMAL_LEN) {
+            snprintf(errmsg, sizeof(errmsg) - 1, "Malformed packet: length is %lu, while maximum length for decimal in column %d is %u bytes",
+                   field->length, i, MAX_DECIMAL_LEN);
+            stmt_set_error(stmt, CR_MALFORMED_PACKET, SQLSTATE_UNKNOWN, errmsg);
+            return MYSQL_DATA_MALFORMED;
+          }
           break;
         default:
           break;
