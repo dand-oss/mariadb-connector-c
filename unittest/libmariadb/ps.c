@@ -5406,6 +5406,9 @@ static int test_vector(MYSQL *mysql)
     return FAIL;
   }
 
+  rc= mysql_query(mysql, "DROP TABLE my_vector");
+  check_mysql_rc(rc, mysql);
+
   return OK;
 }
 
