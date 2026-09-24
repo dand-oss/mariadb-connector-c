@@ -2,6 +2,13 @@
 
 include(CMakeFindDependencyMacro)
 
+if("@WITH_SSL@" STREQUAL "OPENSSL")
+  get_filename_component(_mariadb_ports_root "${PACKAGE_PREFIX_DIR}/.." ABSOLUTE)
+  find_dependency(OpenSSL 3 CONFIG
+    PATHS "${_mariadb_ports_root}/ssl-jp" NO_DEFAULT_PATH)
+  unset(_mariadb_ports_root)
+endif()
+
 include("${CMAKE_CURRENT_LIST_DIR}/@PROJECT_NAME@Targets.cmake")
 
 check_required_components(@PROJECT_NAME@)
