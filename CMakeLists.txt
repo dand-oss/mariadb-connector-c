@@ -407,18 +407,15 @@ ENDIF()
 IF(WITH_SSL)
   STRING(TOUPPER ${WITH_SSL} WITH_SSL)
 ENDIF()
+# ASI: TLS is the ports OpenSSL on every platform (no Schannel on Windows)
 IF(WITH_SSL STREQUAL "ON")
-  IF(WIN32)
-    SET(WITH_SSL "SCHANNEL")
-  ELSE()
-    SET(WITH_SSL "OPENSSL")
-  ENDIF()
+  SET(WITH_SSL "OPENSSL")
 ENDIF()
 
 IF(WITH_SSL STREQUAL "OPENSSL")
-  IF (NOT OPENSSL_FOUND)
-    FIND_PACKAGE(OpenSSL)
-  ENDIF()
+  # ASI: only the ports OpenSSL (ssl-jp), through its exported CMake config -
+  # never a host copy, which would put two OpenSSLs in one process
+  FIND_PACKAGE(OpenSSL 3 CONFIG REQUIRED PATHS ${ASV_PLAT_PORTS}/ssl-jp NO_DEFAULT_PATH)
   IF(OPENSSL_FOUND)
     add_compile_definitions(HAVE_OPENSSL HAVE_TLS)
     SET(SSL_SOURCES "${CC_SOURCE_DIR}/libmariadb/secure/openssl.c"
